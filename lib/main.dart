@@ -1,12 +1,22 @@
 import "package:flutter/material.dart";
+import "package:flutter_riverpod/flutter_riverpod.dart";
 
+import "core/config/env.dart";
+import "core/supabase/supabase_bootstrap.dart";
 import "core/theme/app_theme.dart";
 
-void main() {
-	runApp(const SikaStockApp());
+Future<void> main() async {
+	WidgetsFlutterBinding.ensureInitialized();
+	await Env.load();
+	await SupabaseBootstrap.initialize();
+	runApp(
+		const ProviderScope(
+			child: SikaStockApp(),
+		),
+	);
 }
 
-/// Raíz de la app. Riverpod / Supabase / GoRouter se enganchan acá en fases siguientes.
+/// Raíz de la app. GoRouter y pantallas por rol en fases siguientes.
 class SikaStockApp extends StatelessWidget {
 	const SikaStockApp({super.key});
 
@@ -30,7 +40,7 @@ class _PlaceholderHome extends StatelessWidget {
 			appBar: AppBar(title: const Text("Sika Stock")),
 			body: Center(
 				child: Text(
-					"Proyecto inicial — Web · Android · iOS",
+					"Supabase conectado — Web · Android · iOS",
 					style: Theme.of(context).textTheme.titleMedium,
 					textAlign: TextAlign.center,
 				),

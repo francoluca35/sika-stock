@@ -15,6 +15,9 @@ coverage/
 # *.jks
 # *.keystore
 
+# Secrets locales (copiar desde .env.example)
+.env
+
 # Misc
 *.log
 *.swp

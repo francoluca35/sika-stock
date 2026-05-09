@@ -91,9 +91,10 @@ flutter run -d <id_android_o_ios>
 
 ## Fase 1 — Proyecto Flutter y núcleo
 
-- [x] Crear proyecto Flutter multiplataforma en el repo (esqueleto + completar con `flutter create`).  
-- [ ] Estructura **feature-first**: `lib/core`, `lib/features`, `lib/shared`.  
-- [ ] `supabase_client.dart`: inicialización singleton.  
+- [x] Crear proyecto Flutter multiplataforma en el repo (esqueleto + completar con `flutter create`).
+- [x] Dependencias en `pubspec.yaml`: `supabase_flutter`, `flutter_riverpod`, `go_router`, `intl`, `flutter_dotenv`, `fl_chart`, `pdf`, `printing`, `excel`, `flutter_local_notifications`, `qr_flutter`, `mobile_scanner`. Variables locales: copiar `.env.example` → `.env` (no commitear `.env`; el asset `.env` debe existir para compilar).
+- [ ] Estructura **feature-first**: `lib/core`, `lib/features`, `lib/shared`.
+- [x] `Env.load()` + `Supabase.initialize` en `main.dart`; helpers en `lib/core/config/env.dart` y `lib/core/supabase/supabase_bootstrap.dart`.
 - [ ] Config por entorno (dev/staging/prod): URLs y keys vía `--dart-define` o `.env` según convención del equipo.  
 - [ ] Tema UI alineado a mockups (amarillo / rojo / negro / blanco).  
 
