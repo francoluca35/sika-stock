@@ -1,0 +1,6 @@
+# Edge Functions: si verify_jwt queda en true, el preflight CORS (OPTIONS) falla en la
+# puerta sin Authorization y el navegador bloquea la llamada. Esta función valida el JWT
+# dentro del runtime con supabase.auth.getUser().
+
+[functions.create-user]
+verify_jwt = false

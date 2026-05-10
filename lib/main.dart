@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "core/config/env.dart";
+import "core/router/app_router.dart";
 import "core/supabase/supabase_bootstrap.dart";
 import "core/theme/app_theme.dart";
 
@@ -16,35 +17,17 @@ Future<void> main() async {
 	);
 }
 
-/// Raíz de la app. GoRouter y pantallas por rol en fases siguientes.
-class SikaStockApp extends StatelessWidget {
+class SikaStockApp extends ConsumerWidget {
 	const SikaStockApp({super.key});
 
 	@override
-	Widget build(BuildContext context) {
-		return MaterialApp(
+	Widget build(BuildContext context, WidgetRef ref) {
+		final router = ref.watch(goRouterProvider);
+		return MaterialApp.router(
 			title: "Sika Stock",
 			debugShowCheckedModeBanner: false,
 			theme: AppTheme.light(),
-			home: const _PlaceholderHome(),
-		);
-	}
-}
-
-class _PlaceholderHome extends StatelessWidget {
-	const _PlaceholderHome();
-
-	@override
-	Widget build(BuildContext context) {
-		return Scaffold(
-			appBar: AppBar(title: const Text("Sika Stock")),
-			body: Center(
-				child: Text(
-					"Supabase conectado — Web · Android · iOS",
-					style: Theme.of(context).textTheme.titleMedium,
-					textAlign: TextAlign.center,
-				),
-			),
+			routerConfig: router,
 		);
 	}
 }

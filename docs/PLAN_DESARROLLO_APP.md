@@ -49,6 +49,14 @@ A partir de ahí seguí las **fases numeradas** más abajo en orden.
 
 Objetivo: no duplicar trabajo ni romper RLS cuando conecte la app.
 
+- [ ] Ejecutar migraciones SQL en orden: **`supabase/migrations/20260510000000_profiles_rls.sql`** y **`supabase/migrations/20260510120000_profiles_guard_service_role.sql`** (permite altas con `service_role` desde Edge Functions).
+
+- [ ] **Auth**: desactivar registro público (Dashboard → Authentication → deshabilitar signups por email si aplica).
+
+- [ ] **Admin inicial**: crear usuario `francolucap1@gmail.com` en Authentication y ejecutar **`supabase/seed_admin.sql`** para `SUPERADMIN`. Contraseña solo en Auth (no en repo).
+
+- [ ] **Edge Function** `create-user`: desde repo, `supabase functions deploy create-user --project-ref <TU_REF>` (requiere [Supabase CLI](https://supabase.com/docs/guides/cli) enlazado). Sin esta función, el botón «Nuevos usuarios» fallará al invocar.
+
 - [ ] Confirmar enums o equivalentes para estados de `requests` y compras.  
 - [ ] Confirmar tabla `profiles` ligada a `auth.users` (`id` = UUID del usuario).  
 - [ ] Revisar políticas RLS: cada rol solo ve/edita lo que le corresponde; **SUPERADMIN** con bypass explícito donde aplique.  
@@ -102,11 +110,11 @@ flutter run -d <id_android_o_ios>
 
 ## Fase 2 — Autenticación y rutas por rol
 
-- [ ] Pantalla de login (email/password o magic link según Supabase).  
-- [ ] Tras login: fetch de `profiles` y cache del **rol** en Riverpod.  
-- [ ] **GoRouter**: rutas anidadas por rol (`/mantenimiento/...`, `/supervisor/...`, `/panol/...`, `/compras/...`, `/superadmin/...`).  
-- [ ] Guards: si la ruta no corresponde al rol → redirect al home del rol o login.  
-- [ ] Logout limpiando sesión y estado.  
+- [x] Pantalla **login** (mockup); **sin registro público**. Altas nuevas vía **ADMIN/SUPERADMIN** → pantalla **Nuevos usuarios** → Edge Function **`create-user`** (service role en servidor).
+- [x] Tras login: **GoRouter** + redirect sesión; **Home** con botón **Nuevos usuarios** si el rol es ADMIN o SUPERADMIN.
+- [ ] **GoRouter** por rol: rutas anidadas (`/mantenimiento/...`, `/supervisor/...`, `/panol/...`, `/compras/...`, `/superadmin/...`).  
+- [ ] Guards por **rol** (no solo sesión): redirect según `profiles.rol`.  
+- [x] Logout desde Home (signOut).  
 
 ---
 
