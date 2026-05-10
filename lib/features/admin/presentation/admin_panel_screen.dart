@@ -90,7 +90,7 @@ class AdminPanelScreen extends ConsumerWidget {
 															onUsuarios: () =>
 																context.push("/admin/usuarios"),
 															onPedidos: () =>
-																_soon(context, "Hacer pedidos"),
+																context.push("/pedidos/nuevo"),
 															onStock: () => _soon(context, "Stock"),
 															onSeguimientos: () =>
 																_soon(context, "Seguimientos"),
@@ -104,7 +104,7 @@ class AdminPanelScreen extends ConsumerWidget {
 															onUsuarios: () =>
 																context.push("/admin/usuarios"),
 															onPedidos: () =>
-																_soon(context, "Hacer pedidos"),
+																context.push("/pedidos/nuevo"),
 															onStock: () => _soon(context, "Stock"),
 															onSeguimientos: () =>
 																_soon(context, "Seguimientos"),

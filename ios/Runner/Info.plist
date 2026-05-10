@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Para adjuntar una foto al pedido.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para elegir una imagen del carrete en el pedido.</string>
 </dict>
 </plist>

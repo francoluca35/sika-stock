@@ -9,6 +9,7 @@ import "../../features/admin/presentation/users_list_screen.dart";
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/presentation/login_screen.dart";
 import "../../features/home/presentation/home_screen.dart";
+import "../../features/orders/presentation/place_order_screen.dart";
 
 final goRouterProvider = Provider<GoRouter>((ref) {
 	final client = ref.watch(supabaseClientProvider);
@@ -52,6 +53,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const UsersListScreen(),
+				),
+			),
+			GoRoute(
+				path: "/pedidos/nuevo",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const PlaceOrderScreen(),
 				),
 			),
 		],
