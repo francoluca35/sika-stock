@@ -5,6 +5,7 @@ import "package:go_router/go_router.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
+import "widgets/admin_shell_bottom_bar.dart";
 
 /// Panel principal ADMIN / SUPERADMIN según mockups (desktop 3×2, mobile lista).
 class AdminPanelScreen extends ConsumerWidget {
@@ -87,7 +88,7 @@ class AdminPanelScreen extends ConsumerWidget {
 															onCrearPerfil: () =>
 																context.push("/admin/nuevos-usuarios"),
 															onUsuarios: () =>
-																_soon(context, "Usuarios"),
+																context.push("/admin/usuarios"),
 															onPedidos: () =>
 																_soon(context, "Hacer pedidos"),
 															onStock: () => _soon(context, "Stock"),
@@ -101,7 +102,7 @@ class AdminPanelScreen extends ConsumerWidget {
 															onCrearPerfil: () =>
 																context.push("/admin/nuevos-usuarios"),
 															onUsuarios: () =>
-																_soon(context, "Usuarios"),
+																context.push("/admin/usuarios"),
 															onPedidos: () =>
 																_soon(context, "Hacer pedidos"),
 															onStock: () => _soon(context, "Stock"),
@@ -116,7 +117,7 @@ class AdminPanelScreen extends ConsumerWidget {
 									),
 								),
 							),
-							_AdminBottomBar(
+							AdminShellBottomBar(
 								bottomPadding: bottomInset,
 								onInicio: () {},
 								onOrdenCompra: () =>
@@ -656,112 +657,6 @@ class _MobileTile extends StatelessWidget {
 								),
 							),
 							Icon(Icons.chevron_right, color: Colors.grey.shade600),
-						],
-					),
-				),
-			),
-		);
-	}
-}
-
-class _AdminBottomBar extends StatelessWidget {
-	const _AdminBottomBar({
-		required this.bottomPadding,
-		required this.onInicio,
-		required this.onOrdenCompra,
-		required this.onConfig,
-	});
-
-	final double bottomPadding;
-	final VoidCallback onInicio;
-	final VoidCallback onOrdenCompra;
-	final VoidCallback onConfig;
-
-	static Widget _divider() =>
-		Container(width: 1, height: 36, color: Colors.white24);
-
-	@override
-	Widget build(BuildContext context) {
-		return Container(
-			padding: EdgeInsets.only(bottom: bottomPadding),
-			color: AppTokens.blackNav,
-			child: SafeArea(
-				top: false,
-				child: SizedBox(
-					height: 58,
-					child: Row(
-						children: [
-							Expanded(
-								child: InkWell(
-									onTap: onOrdenCompra,
-									child: const Column(
-										mainAxisAlignment: MainAxisAlignment.center,
-										children: [
-											Icon(
-												Icons.request_quote_outlined,
-												color: Colors.white,
-												size: 24,
-											),
-											SizedBox(height: 2),
-											Text(
-												"CREAR ORDEN\nDE COMPRA",
-												textAlign: TextAlign.center,
-												style: TextStyle(
-													color: Colors.white,
-													fontWeight: FontWeight.bold,
-													fontSize: 9,
-													height: 1.15,
-													letterSpacing: 0.2,
-												),
-											),
-										],
-									),
-								),
-							),
-							_divider(),
-							Expanded(
-								child: InkWell(
-									onTap: onInicio,
-									child: const Column(
-										mainAxisAlignment: MainAxisAlignment.center,
-										children: [
-											Icon(Icons.home, color: AppTokens.yellowAccent, size: 26),
-											SizedBox(height: 2),
-											Text(
-												"INICIO",
-												style: TextStyle(
-													color: AppTokens.yellowAccent,
-													fontWeight: FontWeight.bold,
-													fontSize: 12,
-													letterSpacing: 0.6,
-												),
-											),
-										],
-									),
-								),
-							),
-							_divider(),
-							Expanded(
-								child: InkWell(
-									onTap: onConfig,
-									child: const Column(
-										mainAxisAlignment: MainAxisAlignment.center,
-										children: [
-											Icon(Icons.settings, color: Colors.white, size: 24),
-											SizedBox(height: 2),
-											Text(
-												"CONFIGURACIÓN",
-												style: TextStyle(
-													color: Colors.white,
-													fontWeight: FontWeight.bold,
-													fontSize: 11,
-													letterSpacing: 0.4,
-												),
-											),
-										],
-									),
-								),
-							),
 						],
 					),
 				),

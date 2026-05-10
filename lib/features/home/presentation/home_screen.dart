@@ -62,7 +62,39 @@ class HomeScreen extends ConsumerWidget {
 				body: Center(child: CircularProgressIndicator()),
 			),
 			error: (e, _) => Scaffold(
-				body: Center(child: Text("Error al cargar perfil: $e")),
+				backgroundColor: Colors.grey.shade100,
+				body: SafeArea(
+					child: Center(
+						child: Padding(
+							padding: AppTokens.padScreen,
+							child: Column(
+								mainAxisAlignment: MainAxisAlignment.center,
+								children: [
+									Icon(Icons.error_outline, size: 48, color: Colors.red.shade700),
+									const SizedBox(height: 16),
+									Text(
+										"No se pudo cargar el perfil",
+										style: Theme.of(context).textTheme.titleMedium?.copyWith(
+													fontWeight: FontWeight.bold,
+												),
+										textAlign: TextAlign.center,
+									),
+									const SizedBox(height: 8),
+									Text(
+										"$e",
+										style: TextStyle(color: Colors.grey.shade800, fontSize: 13),
+										textAlign: TextAlign.center,
+									),
+									const SizedBox(height: 24),
+									TextButton(
+										onPressed: () => ref.invalidate(currentProfileProvider),
+										child: const Text("Reintentar"),
+									),
+								],
+							),
+						),
+					),
+				),
 			),
 		);
 	}
