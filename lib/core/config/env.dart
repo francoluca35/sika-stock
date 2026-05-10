@@ -11,7 +11,11 @@ abstract final class Env {
 		if (v == null || v.isEmpty) {
 			throw StateError("SUPABASE_URL falta o está vacío en .env");
 		}
-		return v;
+		var u = v;
+		while (u.endsWith("/")) {
+			u = u.substring(0, u.length - 1);
+		}
+		return u;
 	}
 
 	static String get supabaseAnonKey {
