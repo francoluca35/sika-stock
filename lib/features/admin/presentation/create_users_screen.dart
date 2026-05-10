@@ -7,6 +7,7 @@ import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
 import "../../auth/presentation/widgets/auth_field_styles.dart";
 import "../../auth/presentation/widgets/auth_password_field.dart";
+import "../../orders/presentation/widgets/mobile_sheet_select_field.dart";
 import "../application/admin_providers.dart";
 
 /// Alta de usuarios por ADMIN / SUPERADMIN (Edge Function `create-user`).
@@ -227,17 +228,15 @@ class _CreateUsersScreenState extends ConsumerState<CreateUsersScreen> {
 												child: Text("ROL", style: AuthFieldStyles.labelAbove),
 											),
 											const SizedBox(height: 8),
-											DropdownButtonFormField<AppRole>(
+											MobileSheetSelectFormField<AppRole>(
 												value: _rol,
-												decoration: AuthFieldStyles.outline(
-													hintText: "Seleccioná rol",
-													prefixIcon: Icons.groups_outlined,
-												),
-												items: [
-													for (final r in _rolesDisponibles(caller))
-														DropdownMenuItem(value: r, child: Text(r.label)),
-												],
-												onChanged: _loading ? null : (v) => setState(() => _rol = v),
+												options: _rolesDisponibles(caller),
+												labelOf: (r) => r.label,
+												hintText: "Seleccioná rol",
+												prefixIcon: Icons.groups_outlined,
+												title: "Rol",
+												enabled: !_loading,
+												onChanged: (v) => setState(() => _rol = v),
 												validator: (v) => v == null ? "Elegí un rol" : null,
 											),
 											const SizedBox(height: 28),

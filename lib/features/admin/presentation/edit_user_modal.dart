@@ -8,6 +8,7 @@ import "../../auth/domain/app_role.dart";
 import "../../auth/domain/profile_row.dart";
 import "../../auth/presentation/widgets/auth_field_styles.dart";
 import "../../auth/presentation/widgets/auth_password_field.dart";
+import "../../orders/presentation/widgets/mobile_sheet_select_field.dart";
 import "../application/admin_providers.dart";
 
 /// Abre un panel tipo **celular** (desliza desde abajo) para editar usuario.
@@ -448,17 +449,15 @@ class _EditUserModalState extends ConsumerState<EditUserModal> {
 													child: Text("ROL", style: AuthFieldStyles.labelAbove),
 												),
 												const SizedBox(height: 8),
-												DropdownButtonFormField<AppRole>(
+												MobileSheetSelectFormField<AppRole>(
 													value: _rol != null && roleItems.contains(_rol) ? _rol : null,
-													decoration: AuthFieldStyles.outline(
-														hintText: "Seleccioná rol",
-														prefixIcon: Icons.groups_outlined,
-													),
-													items: [
-														for (final r in roleItems)
-															DropdownMenuItem(value: r, child: Text(r.label)),
-													],
-													onChanged: _loading ? null : (v) => setState(() => _rol = v),
+													options: roleItems,
+													labelOf: (r) => r.label,
+													hintText: "Seleccioná rol",
+													prefixIcon: Icons.groups_outlined,
+													title: "Rol",
+													enabled: !_loading,
+													onChanged: (v) => setState(() => _rol = v),
 													validator: (v) => v == null ? "Elegí un rol" : null,
 												),
 												const SizedBox(height: 24),
