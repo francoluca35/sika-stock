@@ -7,7 +7,7 @@ class OrderHubBottomBar extends StatelessWidget {
 	const OrderHubBottomBar({
 		super.key,
 		required this.bottomPadding,
-		required this.selectedIndex,
+		this.selectedIndex,
 		required this.onPedido,
 		required this.onHistorial,
 		required this.onPerfil,
@@ -15,8 +15,8 @@ class OrderHubBottomBar extends StatelessWidget {
 
 	final double bottomPadding;
 
-	/// 0 = Pedido, 1 = Historial, 2 = Perfil
-	final int selectedIndex;
+	/// 0 = Pedido, 1 = Historial, 2 = Perfil. `null` = ningún ítem resaltado (p. ej. hub Stock).
+	final int? selectedIndex;
 	final VoidCallback onPedido;
 	final VoidCallback onHistorial;
 	final VoidCallback onPerfil;
@@ -25,7 +25,9 @@ class OrderHubBottomBar extends StatelessWidget {
 		Container(width: 1, height: 36, color: Colors.white24);
 
 	Color _itemColor(int index) =>
-		selectedIndex == index ? AppTokens.yellowAccent : Colors.white;
+		selectedIndex != null && selectedIndex == index
+			? AppTokens.yellowAccent
+			: Colors.white;
 
 	@override
 	Widget build(BuildContext context) {

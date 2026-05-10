@@ -10,6 +10,9 @@ import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/presentation/login_screen.dart";
 import "../../features/home/presentation/home_screen.dart";
 import "../../features/orders/presentation/place_order_screen.dart";
+import "../../features/stock/presentation/add_stock_screen.dart";
+import "../../features/stock/presentation/categories_screen.dart";
+import "../../features/stock/presentation/stock_home_screen.dart";
 
 final goRouterProvider = Provider<GoRouter>((ref) {
 	final client = ref.watch(supabaseClientProvider);
@@ -60,6 +63,27 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const PlaceOrderScreen(),
+				),
+			),
+			GoRoute(
+				path: "/stock",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const StockHomeScreen(),
+				),
+			),
+			GoRoute(
+				path: "/stock/agregar",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const AddStockScreen(),
+				),
+			),
+			GoRoute(
+				path: "/stock/categorias",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const CategoriesScreen(),
 				),
 			),
 		],
