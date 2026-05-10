@@ -3,7 +3,9 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "go_router_refresh.dart";
+import "slide_transition_page.dart";
 import "../../features/admin/presentation/create_users_screen.dart";
+import "../../features/admin/presentation/users_list_screen.dart";
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/presentation/login_screen.dart";
 import "../../features/home/presentation/home_screen.dart";
@@ -40,7 +42,17 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 			),
 			GoRoute(
 				path: "/admin/nuevos-usuarios",
-				builder: (context, state) => const CreateUsersScreen(),
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const CreateUsersScreen(),
+				),
+			),
+			GoRoute(
+				path: "/admin/usuarios",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const UsersListScreen(),
+				),
 			),
 		],
 	);

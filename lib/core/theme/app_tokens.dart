@@ -21,6 +21,25 @@ abstract final class AppTokens {
 	static const Color whiteSurface = Color(0xFFFFFFFF);
 	static const Color greyBorder = Color(0xFFE5E7EB);
 
+	/// Fondo de página (listados, tablas).
+	static const Color surfacePage = Color(0xFFF1F5F9);
+
+	/// Cabecera de tabla / bloques neutros.
+	static const Color surfaceMuted = Color(0xFFF8FAFC);
+
+	// Badges de rol (usuarios — paleta corporativa)
+	static const Color roleComprasBg = Color(0xFF047857);
+	static const Color roleComprasFg = Color(0xFFFFFFFF);
+	static const Color rolePanolBg = Color(0xFFEAB308);
+	static const Color rolePanolFg = Color(0xFF1C1917);
+	static const Color roleMantenimientoBg = Color(0xFF1D4ED8);
+	static const Color roleMantenimientoFg = Color(0xFFFFFFFF);
+	/// Supervisor — naranja (badge listado usuarios).
+	static const Color roleSupervisorBg = Color(0xFFEA580C);
+	static const Color roleSupervisorFg = Color(0xFFFFFFFF);
+	static const Color roleAdminBg = Color(0xFF111827);
+	static const Color roleAdminFg = Color(0xFFFFFFFF);
+
 	// Estados (badges)
 	static const Color statusOk = Color(0xFF16A34A);
 	static const Color statusWarn = Color(0xFFEAB308);

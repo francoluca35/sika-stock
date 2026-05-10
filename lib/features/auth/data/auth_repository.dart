@@ -35,9 +35,14 @@ class AuthRepository {
 		final uid = _client.auth.currentUser?.id;
 		if (uid == null) return null;
 
-		final data = await _client.from("profiles").select().eq("id", uid).maybeSingle();
-
-		if (data == null) return null;
-		return ProfileRow.fromMap(Map<String, dynamic>.from(data));
+		try {
+			final raw = await _client.rpc("get_my_profile");
+			if (raw == null) return null;
+			return ProfileRow.fromMap(Map<String, dynamic>.from(raw as Map));
+		} catch (_) {
+			final data = await _client.from("profiles").select().eq("id", uid).maybeSingle();
+			if (data == null) return null;
+			return ProfileRow.fromMap(Map<String, dynamic>.from(data));
+		}
 	}
 }
