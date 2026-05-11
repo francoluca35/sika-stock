@@ -2,7 +2,10 @@ import "package:flutter/material.dart";
 
 import "../../../../core/theme/app_tokens.dart";
 
-/// Barra inferior negra del panel admin (Crear orden / Inicio / Configuración).
+/// Barra inferior negra (Crear orden / Inicio / Configuración).
+///
+/// [showCrearOrdenCompra]: solo **ADMIN**, **SUPERADMIN** y **COMPRAS** deben verlo;
+/// el resto de roles usan [showCrearOrdenCompra]: false (solo Inicio + Configuración).
 class AdminShellBottomBar extends StatelessWidget {
 	const AdminShellBottomBar({
 		super.key,
@@ -10,6 +13,7 @@ class AdminShellBottomBar extends StatelessWidget {
 		required this.onInicio,
 		required this.onOrdenCompra,
 		required this.onConfig,
+		this.showCrearOrdenCompra = true,
 	});
 
 	final double bottomPadding;
@@ -17,11 +21,47 @@ class AdminShellBottomBar extends StatelessWidget {
 	final VoidCallback onOrdenCompra;
 	final VoidCallback onConfig;
 
+	/// Si es false, no se muestra el botón «CREAR ORDEN DE COMPRA».
+	final bool showCrearOrdenCompra;
+
 	static Widget _divider() =>
 		Container(width: 1, height: 36, color: Colors.white24);
 
 	@override
 	Widget build(BuildContext context) {
+		final crearOrden = showCrearOrdenCompra
+				? <Widget>[
+						Expanded(
+							child: InkWell(
+								onTap: onOrdenCompra,
+								child: const Column(
+									mainAxisAlignment: MainAxisAlignment.center,
+									children: [
+										Icon(
+											Icons.request_quote_outlined,
+											color: Colors.white,
+											size: 24,
+										),
+										SizedBox(height: 2),
+										Text(
+											"CREAR ORDEN\nDE COMPRA",
+											textAlign: TextAlign.center,
+											style: TextStyle(
+												color: Colors.white,
+												fontWeight: FontWeight.bold,
+												fontSize: 9,
+												height: 1.15,
+												letterSpacing: 0.2,
+											),
+										),
+									],
+								),
+							),
+						),
+						_divider(),
+					]
+				: <Widget>[];
+
 		return Container(
 			padding: EdgeInsets.only(bottom: bottomPadding),
 			color: AppTokens.blackNav,
@@ -31,34 +71,7 @@ class AdminShellBottomBar extends StatelessWidget {
 					height: 58,
 					child: Row(
 						children: [
-							Expanded(
-								child: InkWell(
-									onTap: onOrdenCompra,
-									child: const Column(
-										mainAxisAlignment: MainAxisAlignment.center,
-										children: [
-											Icon(
-												Icons.request_quote_outlined,
-												color: Colors.white,
-												size: 24,
-											),
-											SizedBox(height: 2),
-											Text(
-												"CREAR ORDEN\nDE COMPRA",
-												textAlign: TextAlign.center,
-												style: TextStyle(
-													color: Colors.white,
-													fontWeight: FontWeight.bold,
-													fontSize: 9,
-													height: 1.15,
-													letterSpacing: 0.2,
-												),
-											),
-										],
-									),
-								),
-							),
-							_divider(),
+							...crearOrden,
 							Expanded(
 								child: InkWell(
 									onTap: onInicio,

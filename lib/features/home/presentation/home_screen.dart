@@ -5,6 +5,7 @@ import "../../../core/theme/app_tokens.dart";
 import "../../admin/presentation/admin_panel_screen.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
+import "../../supervisor/presentation/supervisor_home_screen.dart";
 
 /// Post-login: panel admin según mockups (ADMIN / SUPERADMIN); resto de roles pantalla simple.
 class HomeScreen extends ConsumerWidget {
@@ -12,6 +13,8 @@ class HomeScreen extends ConsumerWidget {
 
 	static bool _isAdminPanel(AppRole? r) =>
 		r == AppRole.admin || r == AppRole.superadmin;
+
+	static bool _isSupervisor(AppRole? r) => r == AppRole.supervisor;
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
@@ -21,6 +24,9 @@ class HomeScreen extends ConsumerWidget {
 			data: (p) {
 				if (_isAdminPanel(p?.rol)) {
 					return const AdminPanelScreen();
+				}
+				if (_isSupervisor(p?.rol)) {
+					return const SupervisorHomeScreen();
 				}
 				return Scaffold(
 					appBar: AppBar(

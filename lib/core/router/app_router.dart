@@ -13,6 +13,9 @@ import "../../features/orders/presentation/place_order_screen.dart";
 import "../../features/stock/presentation/add_stock_screen.dart";
 import "../../features/stock/presentation/categories_screen.dart";
 import "../../features/stock/presentation/stock_home_screen.dart";
+import "../../features/supervisor/presentation/supervisor_maintenance_history_screen.dart";
+import "../../features/supervisor/presentation/supervisor_maintenance_orders_screen.dart";
+import "../../features/supervisor/presentation/supervisor_stock_screen.dart";
 
 final goRouterProvider = Provider<GoRouter>((ref) {
 	final client = ref.watch(supabaseClientProvider);
@@ -70,6 +73,27 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const StockHomeScreen(),
+				),
+			),
+			GoRoute(
+				path: "/supervisor/stock",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const SupervisorStockScreen(),
+				),
+			),
+			GoRoute(
+				path: "/supervisor/pedidos-mantenimiento",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const SupervisorMaintenanceOrdersScreen(),
+				),
+			),
+			GoRoute(
+				path: "/supervisor/historial-pedidos",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const SupervisorMaintenanceHistoryScreen(),
 				),
 			),
 			GoRoute(
