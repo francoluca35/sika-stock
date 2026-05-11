@@ -9,6 +9,7 @@ import "../../features/admin/presentation/users_list_screen.dart";
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/presentation/login_screen.dart";
 import "../../features/home/presentation/home_screen.dart";
+import "../../features/maintenance/presentation/maintenance_pedir_producto_screen.dart";
 import "../../features/orders/presentation/place_order_screen.dart";
 import "../../features/stock/presentation/add_stock_screen.dart";
 import "../../features/stock/presentation/categories_screen.dart";
@@ -66,6 +67,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const PlaceOrderScreen(),
+				),
+			),
+			GoRoute(
+				path: "/mantenimiento/pedir-producto",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const MaintenancePedirProductoScreen(),
 				),
 			),
 			GoRoute(
