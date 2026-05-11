@@ -49,4 +49,7 @@ abstract final class AppTokens {
 	static const double radiusMd = 8;
 	static const double radiusLg = 12;
 	static const EdgeInsets padScreen = EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+
+	/// Ancho máximo del área de contenido en pantallas anchas (web / desktop).
+	static const double maxContentWidth = 1040;
 }
