@@ -5,6 +5,8 @@ import "../../../core/theme/app_tokens.dart";
 import "../../admin/presentation/admin_panel_screen.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
+import "../../auth/domain/profile_row.dart";
+import "../../maintenance/presentation/maintenance_shell_screen.dart";
 import "../../supervisor/presentation/supervisor_home_screen.dart";
 
 /// Post-login: panel admin según mockups (ADMIN / SUPERADMIN); resto de roles pantalla simple.
@@ -15,6 +17,13 @@ class HomeScreen extends ConsumerWidget {
 		r == AppRole.admin || r == AppRole.superadmin;
 
 	static bool _isSupervisor(AppRole? r) => r == AppRole.supervisor;
+
+	static bool _isMantenimiento(ProfileRow? p) {
+		if (p == null) return false;
+		if (p.rol == AppRole.mantenimiento) return true;
+		final s = (p.rolDb ?? "").trim().toUpperCase();
+		return s == "MANTENIMIENTO" || s == "MAINTENANCE";
+	}
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
@@ -27,6 +36,9 @@ class HomeScreen extends ConsumerWidget {
 				}
 				if (_isSupervisor(p?.rol)) {
 					return const SupervisorHomeScreen();
+				}
+				if (p != null && _isMantenimiento(p)) {
+					return MaintenanceShellScreen(profile: p);
 				}
 				return Scaffold(
 					appBar: AppBar(

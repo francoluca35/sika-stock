@@ -16,7 +16,13 @@ enum AppRole {
 
 	static AppRole? fromDb(String? value) {
 		if (value == null) return null;
-		final v = value.trim().toUpperCase();
+		var v = value.trim();
+		v = v.replaceAll(RegExp(r"[\uFEFF\u200B]"), "");
+		v = v.toUpperCase();
+		// Sinónimos que a veces aparecen en BD / migraciones.
+		if (v == "MAINTENANCE") {
+			return AppRole.mantenimiento;
+		}
 		for (final r in AppRole.values) {
 			if (r.dbValue == v) return r;
 		}

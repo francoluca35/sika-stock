@@ -118,6 +118,24 @@ class SupervisorHomeScreen extends ConsumerWidget {
 											const SizedBox(height: 12),
 											_SupervisorMenuCard(
 												leadingDecoration: const BoxDecoration(
+													color: AppTokens.whiteSurface,
+													borderRadius: BorderRadius.all(Radius.circular(12)),
+													border: Border.fromBorderSide(
+														BorderSide(color: AppTokens.redAction, width: 1.4),
+													),
+												),
+												leading: const Icon(
+													Icons.add_box_outlined,
+													color: AppTokens.redAction,
+													size: 28,
+												),
+												title: "AGREGAR STOCK",
+												subtitle: "Carga provisoria de ingresos al inventario",
+												onTap: () => context.push("/stock/agregar"),
+											),
+											const SizedBox(height: 12),
+											_SupervisorMenuCard(
+												leadingDecoration: const BoxDecoration(
 													color: AppTokens.redAction,
 													borderRadius: BorderRadius.all(Radius.circular(12)),
 												),
