@@ -7,6 +7,7 @@ import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
 import "../../compras/presentation/compras_home_screen.dart";
 import "../../panol/presentation/panol_home_screen.dart";
+import "../../orders/presentation/maintenance_home_screen.dart";
 import "../../supervisor/presentation/supervisor_home_screen.dart";
 
 /// Post-login: panel admin según mockups (ADMIN / SUPERADMIN); resto de roles pantalla simple.
@@ -37,6 +38,9 @@ class HomeScreen extends ConsumerWidget {
 				}
 				if (_isCompras(p?.rol)) {
 					return const ComprasHomeScreen();
+				}
+				if (p?.rol == AppRole.mantenimiento) {
+					return const MaintenanceHomeScreen();
 				}
 				return Scaffold(
 					appBar: AppBar(

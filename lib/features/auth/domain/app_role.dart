@@ -22,5 +22,34 @@ enum AppRole {
 		}
 		return null;
 	}
+}
 
+/// Roles que pueden **crear** pedidos de mantenimiento (van a supervisor).
+bool appRolePuedeCrearPedidoMantenimiento(AppRole? rol) {
+	switch (rol) {
+		case AppRole.mantenimiento:
+		case AppRole.admin:
+		case AppRole.superadmin:
+			return true;
+		case AppRole.supervisor:
+		case AppRole.panol:
+		case AppRole.compras:
+		case null:
+			return false;
+	}
+}
+
+/// Roles con acceso a la pantalla **Seguimiento** (`/panol/seguimiento`).
+bool appRolePuedeAccederASeguimiento(AppRole? rol) {
+	switch (rol) {
+		case AppRole.panol:
+		case AppRole.supervisor:
+		case AppRole.admin:
+		case AppRole.superadmin:
+			return true;
+		case AppRole.mantenimiento:
+		case AppRole.compras:
+		case null:
+			return false;
+	}
 }

@@ -14,4 +14,22 @@ class CompletedMaintenanceRecord {
 	final MaintenanceOrder pedido;
 	final DateTime fechaCierre;
 	final String motivoCierre;
+
+	/// Fila desde Supabase para historial del supervisor.
+	factory CompletedMaintenanceRecord.fromOrder(MaintenanceOrder o) {
+		final ws = o.workflowStatus;
+		final motivo = switch (ws) {
+			MaintenanceWorkflowStatus.completed => "Entregado",
+			MaintenanceWorkflowStatus.forwardedToPanol => "Consulta con pañol",
+			MaintenanceWorkflowStatus.cancelled => "Cancelado",
+			_ => "Cerrado",
+		};
+		final fecha = o.updatedAt ?? o.fechaPedido;
+		return CompletedMaintenanceRecord(
+			id: o.id,
+			pedido: o,
+			fechaCierre: fecha,
+			motivoCierre: motivo,
+		);
+	}
 }

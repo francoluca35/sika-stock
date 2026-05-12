@@ -4,28 +4,39 @@ import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
+import "../../supervisor/application/maintenance_orders_provider.dart";
 import "../../supervisor/application/maintenance_orders_realtime_provider.dart";
+import "../application/mantenimiento_notificaciones_provider.dart";
+import "widgets/order_hub_bottom_bar.dart";
 
-/// Pantalla inicial **Pañol**: solo accesos; cada uno abre su propia pantalla.
-class PanolHomeScreen extends ConsumerWidget {
-	const PanolHomeScreen({super.key});
+/// Inicio del rol **Mantenimiento**: hacer pedido e historial de pedidos (sin hub de gestión de stock).
+class MaintenanceHomeScreen extends ConsumerWidget {
+	const MaintenanceHomeScreen({super.key});
+
+	void _soon(BuildContext context, String msg) {
+		ScaffoldMessenger.of(context).showSnackBar(
+			SnackBar(content: Text("$msg — próximamente.")),
+		);
+	}
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
 		ref.watch(maintenanceOrdersRealtimeTickProvider);
+		final bottomInset = MediaQuery.paddingOf(context).bottom;
+
 		return Scaffold(
 			backgroundColor: AppTokens.surfacePage,
 			body: Column(
 				crossAxisAlignment: CrossAxisAlignment.stretch,
 				children: [
-					_PanolHomeHeader(
+					_MaintenanceHomeHeader(
 						onLogout: () async {
 							await ref.read(authRepositoryProvider).signOut();
 						},
 					),
 					Expanded(
 						child: SingleChildScrollView(
-							padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+							padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
 							child: Align(
 								alignment: Alignment.topCenter,
 								child: ConstrainedBox(
@@ -33,75 +44,44 @@ class PanolHomeScreen extends ConsumerWidget {
 									child: Column(
 										crossAxisAlignment: CrossAxisAlignment.stretch,
 										children: [
+											const _MaintenanceNotificationsBlock(),
+											const SizedBox(height: 8),
 											Text(
-												"Seleccioná una opción",
+												"Pedidos de mantenimiento",
 												style: TextStyle(
 													color: Colors.grey.shade700,
 													fontSize: 14,
 												),
 											),
 											const SizedBox(height: 18),
-											_PanolMenuCard(
+											_MaintenanceMenuCard(
 												leadingDecoration: const BoxDecoration(
 													color: AppTokens.redAction,
 													borderRadius: BorderRadius.all(Radius.circular(12)),
 												),
 												leading: const Icon(
-													Icons.inventory_2_outlined,
+													Icons.add_shopping_cart_outlined,
 													color: Colors.white,
 													size: 28,
 												),
-												title: "STOCK",
-												subtitle: "Tabla, acciones y gestión de inventario",
-												onTap: () => context.push("/panol/stock"),
+												title: "HACER PEDIDO",
+												subtitle: "Solicitar repuestos o materiales al supervisor",
+												onTap: () => context.push("/pedidos/nuevo"),
 											),
-											const SizedBox(height: 12),
-											_PanolMenuCard(
-												leadingDecoration: BoxDecoration(
-													color: AppTokens.blackNav,
-													borderRadius: BorderRadius.circular(12),
+											const SizedBox(height: 16),
+											_MaintenanceMenuCard(
+												leadingDecoration: const BoxDecoration(
+													color: Colors.black87,
+													borderRadius: BorderRadius.all(Radius.circular(12)),
 												),
 												leading: const Icon(
-													Icons.assignment_outlined,
+													Icons.history,
 													color: Colors.white,
 													size: 28,
 												),
-												title: "PEDIDOS",
-												subtitle: "Analizar stock, pedir y últimos pedidos",
-												onTap: () => context.push("/panol/pedidos"),
-											),
-											const SizedBox(height: 12),
-											_PanolMenuCard(
-												leadingDecoration: const BoxDecoration(
-													color: AppTokens.whiteSurface,
-													borderRadius: BorderRadius.all(Radius.circular(12)),
-													border: Border.fromBorderSide(
-														BorderSide(color: Colors.black87, width: 1.5),
-													),
-												),
-												leading: const Icon(
-													Icons.category_outlined,
-													color: Colors.black87,
-													size: 28,
-												),
-												title: "CATEGORÍAS",
-												subtitle: "Ver, agregar, editar o eliminar categorías",
-												onTap: () => context.push("/panol/categorias"),
-											),
-											const SizedBox(height: 12),
-											_PanolMenuCard(
-												leadingDecoration: const BoxDecoration(
-													color: AppTokens.yellowAccent,
-													borderRadius: BorderRadius.all(Radius.circular(12)),
-												),
-												leading: const Icon(
-													Icons.show_chart,
-													color: Colors.black87,
-													size: 28,
-												),
-												title: "SEGUIMIENTO",
-												subtitle: "Seguimiento de pedidos y órdenes",
-												onTap: () => context.push("/panol/seguimiento"),
+												title: "HISTORIAL DE PEDIDOS",
+												subtitle: "Ver el estado de tus pedidos y retiros",
+												onTap: () => context.push("/pedidos/mis-pedidos"),
 											),
 										],
 									),
@@ -109,14 +89,121 @@ class PanolHomeScreen extends ConsumerWidget {
 							),
 						),
 					),
+					OrderHubBottomBar(
+						bottomPadding: bottomInset,
+						selectedIndex: null,
+						onPedido: () => context.push("/pedidos/nuevo"),
+						onHistorial: () => context.push("/pedidos/mis-pedidos"),
+						onPerfil: () => _soon(context, "Perfil"),
+					),
 				],
 			),
 		);
 	}
 }
 
-class _PanolHomeHeader extends StatelessWidget {
-	const _PanolHomeHeader({required this.onLogout});
+class _MaintenanceNotificationsBlock extends ConsumerWidget {
+	const _MaintenanceNotificationsBlock();
+
+	@override
+	Widget build(BuildContext context, WidgetRef ref) {
+		final async = ref.watch(mantenimientoNotificacionesProvider);
+		return async.when(
+			data: (list) {
+				if (list.isEmpty) return const SizedBox.shrink();
+				return Material(
+					color: const Color(0xFFE3F2FD),
+					borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+					elevation: 0,
+					child: Container(
+						decoration: BoxDecoration(
+							borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+							border: Border.all(color: Colors.blue.shade200),
+						),
+						padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+						child: Column(
+							crossAxisAlignment: CrossAxisAlignment.stretch,
+							children: [
+								Row(
+									children: [
+										Icon(Icons.notifications_active_outlined, size: 20, color: Colors.blue.shade900),
+										const SizedBox(width: 8),
+										Text(
+											"Avisos",
+											style: TextStyle(
+												fontWeight: FontWeight.bold,
+												fontSize: 14,
+												color: Colors.blue.shade900,
+											),
+										),
+									],
+								),
+								const SizedBox(height: 8),
+								for (final n in list.take(8))
+									Padding(
+										padding: const EdgeInsets.only(bottom: 8),
+										child: Material(
+											color: AppTokens.whiteSurface,
+											borderRadius: BorderRadius.circular(8),
+											child: Padding(
+												padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+												child: Row(
+													crossAxisAlignment: CrossAxisAlignment.start,
+													children: [
+														Expanded(
+															child: Column(
+																crossAxisAlignment: CrossAxisAlignment.start,
+																children: [
+																	Text(
+																		n.title,
+																		style: TextStyle(
+																			fontWeight: FontWeight.w800,
+																			fontSize: 13,
+																			color: n.kind == "stock_ok_retiro"
+																					? const Color(0xFF1B5E20)
+																					: Colors.orange.shade900,
+																		),
+																	),
+																	const SizedBox(height: 4),
+																	Text(
+																		n.body,
+																		style: TextStyle(
+																			fontSize: 12.5,
+																			height: 1.25,
+																			color: Colors.grey.shade800,
+																		),
+																	),
+																],
+															),
+														),
+														if (n.isUnread)
+															TextButton(
+																onPressed: () async {
+																	await ref
+																			.read(maintenanceOrdersRepositoryProvider)
+																			.markNotificationRead(n.id);
+																	ref.invalidate(mantenimientoNotificacionesProvider);
+																},
+																child: const Text("OK"),
+															),
+													],
+												),
+											),
+										),
+									),
+							],
+						),
+					),
+				);
+			},
+			loading: () => const SizedBox.shrink(),
+			error: (_, __) => const SizedBox.shrink(),
+		);
+	}
+}
+
+class _MaintenanceHomeHeader extends StatelessWidget {
+	const _MaintenanceHomeHeader({required this.onLogout});
 
 	final Future<void> Function() onLogout;
 
@@ -133,11 +220,11 @@ class _PanolHomeHeader extends StatelessWidget {
 					child: Row(
 						children: [
 							const Text(
-								"PAÑOL",
+								"MANTENIMIENTO",
 								style: TextStyle(
 									fontWeight: FontWeight.bold,
-									fontSize: 20,
-									letterSpacing: 0.8,
+									fontSize: 18,
+									letterSpacing: 0.6,
 									color: Colors.black87,
 								),
 							),
@@ -158,14 +245,6 @@ class _PanolHomeHeader extends StatelessWidget {
 											),
 										),
 										const SizedBox(width: 6),
-										const Text(
-											"PAÑOL",
-											style: TextStyle(
-												fontWeight: FontWeight.w700,
-												fontSize: 14,
-												color: Colors.black87,
-											),
-										),
 										const Icon(Icons.arrow_drop_down, color: Colors.black87),
 									],
 								),
@@ -191,8 +270,8 @@ class _PanolHomeHeader extends StatelessWidget {
 	}
 }
 
-class _PanolMenuCard extends StatelessWidget {
-	const _PanolMenuCard({
+class _MaintenanceMenuCard extends StatelessWidget {
+	const _MaintenanceMenuCard({
 		required this.leadingDecoration,
 		required this.leading,
 		required this.title,

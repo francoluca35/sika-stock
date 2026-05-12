@@ -5,6 +5,8 @@ import "package:go_router/go_router.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
+import "../../supervisor/application/maintenance_orders_provider.dart";
+import "../../supervisor/application/maintenance_orders_realtime_provider.dart";
 import "widgets/admin_shell_bottom_bar.dart";
 
 /// Panel principal ADMIN / SUPERADMIN según mockups (desktop 3×2, mobile lista).
@@ -38,8 +40,11 @@ class AdminPanelScreen extends ConsumerWidget {
 
 		return profileAsync.when(
 			data: (p) {
+				ref.watch(maintenanceOrdersRealtimeTickProvider);
 				final welcome = _welcomeName(p);
 				final bottomInset = MediaQuery.paddingOf(context).bottom;
+				final pedidosMantenimientoPendientes =
+					ref.watch(supervisorPendingMaintenanceBadgeProvider);
 
 				return Scaffold(
 					backgroundColor: AppTokens.whiteSurface,
@@ -91,11 +96,18 @@ class AdminPanelScreen extends ConsumerWidget {
 																context.push("/admin/usuarios"),
 															onPedidos: () =>
 																context.push("/pedidos/nuevo"),
-															onStock: () => context.push("/stock"),
+															onStock: () => context.push("/panol/stock"),
+															onPedidosMantenimiento: () => context.push(
+																"/supervisor/pedidos-mantenimiento",
+															),
+															pedidosMantenimientoPendientes:
+																pedidosMantenimientoPendientes,
 															onSeguimientos: () =>
-																_soon(context, "Seguimientos"),
+																context.push("/panol/seguimiento"),
 															onHistorial: () =>
-																_soon(context, "Historial de pedidos"),
+																context.push("/compras/historial-pedidos"),
+															onHistorialMantenimiento: () => context
+																.push("/supervisor/historial-pedidos"),
 														)
 													else
 														_DesktopActionGrid(
@@ -105,11 +117,18 @@ class AdminPanelScreen extends ConsumerWidget {
 																context.push("/admin/usuarios"),
 															onPedidos: () =>
 																context.push("/pedidos/nuevo"),
-															onStock: () => context.push("/stock"),
+															onStock: () => context.push("/panol/stock"),
+															onPedidosMantenimiento: () => context.push(
+																"/supervisor/pedidos-mantenimiento",
+															),
+															pedidosMantenimientoPendientes:
+																pedidosMantenimientoPendientes,
 															onSeguimientos: () =>
-																_soon(context, "Seguimientos"),
+																context.push("/panol/seguimiento"),
 															onHistorial: () =>
-																_soon(context, "Historial de pedidos"),
+																context.push("/compras/historial-pedidos"),
+															onHistorialMantenimiento: () => context
+																.push("/supervisor/historial-pedidos"),
 														),
 												],
 											),
@@ -285,16 +304,22 @@ class _DesktopActionGrid extends StatelessWidget {
 		required this.onUsuarios,
 		required this.onPedidos,
 		required this.onStock,
+		required this.onPedidosMantenimiento,
+		required this.pedidosMantenimientoPendientes,
 		required this.onSeguimientos,
 		required this.onHistorial,
+		required this.onHistorialMantenimiento,
 	});
 
 	final VoidCallback onCrearPerfil;
 	final VoidCallback onUsuarios;
 	final VoidCallback onPedidos;
 	final VoidCallback onStock;
+	final VoidCallback onPedidosMantenimiento;
+	final int pedidosMantenimientoPendientes;
 	final VoidCallback onSeguimientos;
 	final VoidCallback onHistorial;
+	final VoidCallback onHistorialMantenimiento;
 
 	@override
 	Widget build(BuildContext context) {
@@ -342,8 +367,17 @@ class _DesktopActionGrid extends StatelessWidget {
 							border: Border.all(color: Colors.black87, width: 1.5),
 							icon: Icons.inventory_2_outlined,
 							title: "STOCK",
-							subtitle: "Consulta y gestiona el inventario",
+							subtitle: "Tabla, acciones y gestión de inventario",
 							onTap: onStock,
+						),
+						_DesktopCard(
+							bg: AppTokens.redAction,
+							fg: Colors.white,
+							icon: Icons.handyman_outlined,
+							title: "PEDIDOS DE MANTENIMIENTO",
+							subtitle: "Gestionar solicitudes de mantenimiento",
+							onTap: onPedidosMantenimiento,
+							pendingCount: pedidosMantenimientoPendientes,
 						),
 						_DesktopCard(
 							bg: AppTokens.yellowHeader,
@@ -358,9 +392,19 @@ class _DesktopActionGrid extends StatelessWidget {
 							fg: Colors.white,
 							icon: Icons.assignment_outlined,
 							title: "HISTORIAL DE PEDIDOS",
-							subtitle: "Consulta el historial de todos los pedidos",
+							subtitle: "Mismo listado que Compras: solicitudes y seguimiento",
 							onTap: onHistorial,
 							subtitleLight: true,
+						),
+						_DesktopCard(
+							bg: Colors.white,
+							fg: Colors.black87,
+							border: Border.all(color: Colors.black87, width: 1.5),
+							icon: Icons.history_edu_outlined,
+							title: "HISTORIAL MANTENIMIENTO",
+							subtitle:
+								"Entregados, consulta pañol y cancelados (como Supervisor)",
+							onTap: onHistorialMantenimiento,
 						),
 					],
 				);
@@ -380,6 +424,7 @@ class _DesktopCard extends StatelessWidget {
 		this.border,
 		this.iconBadge = false,
 		this.subtitleLight = false,
+		this.pendingCount = 0,
 	});
 
 	static const double _iconSize = 46;
@@ -393,6 +438,7 @@ class _DesktopCard extends StatelessWidget {
 	final BoxBorder? border;
 	final bool iconBadge;
 	final bool subtitleLight;
+	final int pendingCount;
 
 	@override
 	Widget build(BuildContext context) {
@@ -407,68 +453,79 @@ class _DesktopCard extends StatelessWidget {
 						borderRadius: BorderRadius.circular(AppTokens.radiusLg),
 						border: border,
 					),
-					child: Padding(
-						padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-						child: Column(
-							mainAxisAlignment: MainAxisAlignment.center,
-							crossAxisAlignment: CrossAxisAlignment.center,
-							children: [
-								SizedBox(
-									height: _iconSize + 6,
-									child: Center(
-										child: iconBadge
-											? Stack(
-												clipBehavior: Clip.none,
-												alignment: Alignment.center,
-												children: [
-													Icon(icon, size: _iconSize, color: fg),
-													Positioned(
-														right: -5,
-														top: -3,
-														child: Container(
-															padding: const EdgeInsets.all(3),
-															decoration: const BoxDecoration(
-																color: AppTokens.redAction,
-																shape: BoxShape.circle,
+					child: Stack(
+						clipBehavior: Clip.none,
+						children: [
+							Padding(
+								padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+								child: Column(
+									mainAxisAlignment: MainAxisAlignment.center,
+									crossAxisAlignment: CrossAxisAlignment.center,
+									children: [
+										SizedBox(
+											height: _iconSize + 6,
+											child: Center(
+												child: iconBadge
+													? Stack(
+														clipBehavior: Clip.none,
+														alignment: Alignment.center,
+														children: [
+															Icon(icon, size: _iconSize, color: fg),
+															Positioned(
+																right: -5,
+																top: -3,
+																child: Container(
+																	padding: const EdgeInsets.all(3),
+																	decoration: const BoxDecoration(
+																		color: AppTokens.redAction,
+																		shape: BoxShape.circle,
+																	),
+																	child: const Icon(Icons.add, color: Colors.white, size: 13),
+																),
 															),
-															child: const Icon(Icons.add, color: Colors.white, size: 13),
-														),
-													),
-												],
-											)
-											: Icon(icon, size: _iconSize, color: fg),
-									),
+														],
+													)
+													: Icon(icon, size: _iconSize, color: fg),
+											),
+										),
+										const SizedBox(height: 8),
+										Text(
+											title,
+											textAlign: TextAlign.center,
+											maxLines: 2,
+											overflow: TextOverflow.ellipsis,
+											style: TextStyle(
+												fontWeight: FontWeight.bold,
+												fontSize: 13,
+												letterSpacing: 0.3,
+												height: 1.12,
+												color: fg,
+											),
+										),
+										const SizedBox(height: 5),
+										Text(
+											subtitle,
+											textAlign: TextAlign.center,
+											maxLines: 3,
+											overflow: TextOverflow.ellipsis,
+											style: TextStyle(
+												fontSize: 11,
+												height: 1.25,
+												color: subtitleLight
+													? Colors.white.withValues(alpha: 0.92)
+													: fg.withValues(alpha: 0.82),
+											),
+										),
+									],
 								),
-								const SizedBox(height: 8),
-								Text(
-									title,
-									textAlign: TextAlign.center,
-									maxLines: 2,
-									overflow: TextOverflow.ellipsis,
-									style: TextStyle(
-										fontWeight: FontWeight.bold,
-										fontSize: 13,
-										letterSpacing: 0.3,
-										height: 1.12,
-										color: fg,
-									),
+							),
+							if (pendingCount > 0)
+								Positioned(
+									top: 6,
+									right: 6,
+									child: _AdminCornerBadge(count: pendingCount),
 								),
-								const SizedBox(height: 5),
-								Text(
-									subtitle,
-									textAlign: TextAlign.center,
-									maxLines: 3,
-									overflow: TextOverflow.ellipsis,
-									style: TextStyle(
-										fontSize: 11,
-										height: 1.25,
-										color: subtitleLight
-											? Colors.white.withValues(alpha: 0.92)
-											: fg.withValues(alpha: 0.82),
-									),
-								),
-							],
-						),
+						],
 					),
 				),
 			),
@@ -482,16 +539,22 @@ class _MobileActionList extends StatelessWidget {
 		required this.onUsuarios,
 		required this.onPedidos,
 		required this.onStock,
+		required this.onPedidosMantenimiento,
+		required this.pedidosMantenimientoPendientes,
 		required this.onSeguimientos,
 		required this.onHistorial,
+		required this.onHistorialMantenimiento,
 	});
 
 	final VoidCallback onCrearPerfil;
 	final VoidCallback onUsuarios;
 	final VoidCallback onPedidos;
 	final VoidCallback onStock;
+	final VoidCallback onPedidosMantenimiento;
+	final int pedidosMantenimientoPendientes;
 	final VoidCallback onSeguimientos;
 	final VoidCallback onHistorial;
+	final VoidCallback onHistorialMantenimiento;
 
 	@override
 	Widget build(BuildContext context) {
@@ -531,8 +594,18 @@ class _MobileActionList extends StatelessWidget {
 					icon: Icons.inventory_2_outlined,
 					iconColor: Colors.black87,
 					title: "STOCK",
-					subtitle: "Consulta y gestiona el inventario",
+					subtitle: "Tabla, acciones y gestión de inventario",
 					onTap: onStock,
+				),
+				const SizedBox(height: 12),
+				_MobileTile(
+					leadingBg: AppTokens.redAction,
+					icon: Icons.handyman_outlined,
+					iconColor: Colors.white,
+					title: "PEDIDOS DE MANTENIMIENTO",
+					subtitle: "Gestionar solicitudes de mantenimiento",
+					onTap: onPedidosMantenimiento,
+					trailingBadgeCount: pedidosMantenimientoPendientes,
 				),
 				const SizedBox(height: 12),
 				_MobileTile(
@@ -549,9 +622,20 @@ class _MobileActionList extends StatelessWidget {
 					icon: Icons.assignment_outlined,
 					iconColor: Colors.white,
 					title: "HISTORIAL DE PEDIDOS",
-					subtitle: "Consulta el historial de todos los pedidos",
+					subtitle: "Mismo listado que Compras: solicitudes y seguimiento",
 					onTap: onHistorial,
 					darkTile: true,
+				),
+				const SizedBox(height: 12),
+				_MobileTile(
+					leadingBg: Colors.white,
+					border: Border.all(color: Colors.black87, width: 1.2),
+					icon: Icons.history_edu_outlined,
+					iconColor: Colors.black87,
+					title: "HISTORIAL MANTENIMIENTO",
+					subtitle:
+						"Entregados, consulta pañol y cancelados (como Supervisor)",
+					onTap: onHistorialMantenimiento,
 				),
 			],
 		);
@@ -569,6 +653,7 @@ class _MobileTile extends StatelessWidget {
 		this.border,
 		this.badge = false,
 		this.darkTile = false,
+		this.trailingBadgeCount = 0,
 	});
 
 	final Color leadingBg;
@@ -580,6 +665,7 @@ class _MobileTile extends StatelessWidget {
 	final BoxBorder? border;
 	final bool badge;
 	final bool darkTile;
+	final int trailingBadgeCount;
 
 	@override
 	Widget build(BuildContext context) {
@@ -656,10 +742,108 @@ class _MobileTile extends StatelessWidget {
 									],
 								),
 							),
-							Icon(Icons.chevron_right, color: Colors.grey.shade600),
+							trailingBadgeCount > 0
+								? _AdminChevronCountBadge(count: trailingBadgeCount)
+								: Icon(Icons.chevron_right, color: Colors.grey.shade600),
 						],
 					),
 				),
+			),
+		);
+	}
+}
+
+class _AdminCornerBadge extends StatelessWidget {
+	const _AdminCornerBadge({required this.count});
+
+	final int count;
+
+	String get _label {
+		if (count > 99) return "99+";
+		return "$count";
+	}
+
+	@override
+	Widget build(BuildContext context) {
+		return Container(
+			constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+			padding: const EdgeInsets.symmetric(horizontal: 6),
+			decoration: BoxDecoration(
+				color: Colors.white,
+				shape: BoxShape.circle,
+				border: Border.all(color: AppTokens.redAction, width: 2),
+				boxShadow: const [
+					BoxShadow(
+						color: Colors.black26,
+						blurRadius: 4,
+						offset: Offset(0, 1),
+					),
+				],
+			),
+			alignment: Alignment.center,
+			child: Text(
+				_label,
+				style: const TextStyle(
+					color: AppTokens.redAction,
+					fontSize: 11,
+					fontWeight: FontWeight.w800,
+					height: 1,
+				),
+			),
+		);
+	}
+}
+
+class _AdminChevronCountBadge extends StatelessWidget {
+	const _AdminChevronCountBadge({required this.count});
+
+	final int count;
+
+	String get _label {
+		if (count > 99) return "99+";
+		return "$count";
+	}
+
+	@override
+	Widget build(BuildContext context) {
+		return SizedBox(
+			width: 40,
+			height: 32,
+			child: Stack(
+				clipBehavior: Clip.none,
+				alignment: Alignment.center,
+				children: [
+					Icon(Icons.chevron_right, color: Colors.grey.shade600, size: 26),
+					Positioned(
+						right: -2,
+						top: -6,
+						child: Container(
+							constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+							padding: const EdgeInsets.symmetric(horizontal: 5),
+							decoration: const BoxDecoration(
+								color: AppTokens.redAction,
+								shape: BoxShape.circle,
+								boxShadow: [
+									BoxShadow(
+										color: Colors.black26,
+										blurRadius: 4,
+										offset: Offset(0, 1),
+									),
+								],
+							),
+							alignment: Alignment.center,
+							child: Text(
+								_label,
+								style: const TextStyle(
+									color: Colors.white,
+									fontSize: 11,
+									fontWeight: FontWeight.w800,
+									height: 1,
+								),
+							),
+						),
+					),
+				],
 			),
 		);
 	}

@@ -1,86 +1,104 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
+import "../../auth/application/auth_providers.dart";
+import "../data/maintenance_orders_repository.dart";
 import "../domain/maintenance_order.dart";
-import "maintenance_history_provider.dart";
+import "maintenance_orders_realtime_provider.dart";
+import "supervisor_maintenance_history_provider.dart";
 
-/// Listado de pedidos de mantenimiento (demo → RPC / tabla Supabase).
+final maintenanceOrdersRepositoryProvider = Provider<MaintenanceOrdersRepository>(
+	(ref) => MaintenanceOrdersRepository(ref.watch(supabaseClientProvider)),
+);
+
+/// Pedidos activos para supervisor: esperando decisión o con stock confirmado.
 final maintenanceOrdersProvider =
-		NotifierProvider<MaintenanceOrdersNotifier, List<MaintenanceOrder>>(
+		AsyncNotifierProvider<MaintenanceOrdersNotifier, List<MaintenanceOrder>>(
 	MaintenanceOrdersNotifier.new,
 );
 
-class MaintenanceOrdersNotifier extends Notifier<List<MaintenanceOrder>> {
-	static List<MaintenanceOrder> _demo() => [
-				MaintenanceOrder(
-					id: "1",
-					numeroOrden: "ORD-0001",
-					fechaPedido: DateTime(2024, 5, 20, 10, 30),
-					producto: "MOTOR ELÉCTRICO",
-					estado: MaintenanceOrderStatus.pendiente,
-					solicitante: "Roberto Díaz — Producción línea 2",
-					motivo:
-							"Revisión por vibración anormal y ruido en rodamiento delantero.",
-					imagenUrl: "https://picsum.photos/seed/maint1/900/500",
-				),
-				MaintenanceOrder(
-					id: "2",
-					numeroOrden: "ORD-0002",
-					fechaPedido: DateTime(2024, 5, 19, 14, 15),
-					producto: "BOMBA HIDRÁULICA",
-					estado: MaintenanceOrderStatus.enviado,
-					solicitante: "Laura Martínez — Mantenimiento",
-					motivo: "Pérdida de presión intermitente en circuito principal.",
-					imagenUrl: null,
-				),
-				MaintenanceOrder(
-					id: "3",
-					numeroOrden: "ORD-0003",
-					fechaPedido: DateTime(2024, 5, 21, 8, 45),
-					producto: "COMPRESOR",
-					estado: MaintenanceOrderStatus.enProceso,
-					solicitante: "Carlos Vega — Pañol",
-					motivo: "Calibración y cambio de filtros según plan anual.",
-				),
-				MaintenanceOrder(
-					id: "5",
-					numeroOrden: "ORD-0005",
-					fechaPedido: DateTime(2024, 5, 22, 9, 10),
-					producto: "MOTOR ELÉCTRICO",
-					estado: MaintenanceOrderStatus.pendiente,
-					solicitante: "Pedro Ruiz — Turno noche",
-					motivo: "Solicitud de rodillo de repuesto por desgate.",
-				),
-				MaintenanceOrder(
-					id: "6",
-					numeroOrden: "ORD-0006",
-					fechaPedido: DateTime(2024, 5, 17, 11, 20),
-					producto: "BOMBA HIDRÁULICA",
-					estado: MaintenanceOrderStatus.enviado,
-					solicitante: "María López — Calidad",
-					motivo: "Chequeo tras parada programada de fin de semana.",
-				),
-				MaintenanceOrder(
-					id: "7",
-					numeroOrden: "ORD-0007",
-					fechaPedido: DateTime(2024, 5, 23, 7, 50),
-					producto: "COMPRESOR",
-					estado: MaintenanceOrderStatus.enProceso,
-					solicitante: "Lucía Fernández — Seguridad e higiene",
-					motivo: "Actualización de mangueras y revisiones CE.",
-				),
-			];
-
+class MaintenanceOrdersNotifier extends AsyncNotifier<List<MaintenanceOrder>> {
 	@override
-	List<MaintenanceOrder> build() => List<MaintenanceOrder>.from(_demo());
+	Future<List<MaintenanceOrder>> build() {
+		ref.watch(maintenanceOrdersRealtimeTickProvider);
+		return ref.read(maintenanceOrdersRepositoryProvider).fetchSupervisorActive();
+	}
 
-	/// Quita el pedido del listado activo y lo registra en historial como cerrado por retiro.
-	void registrarRetiro(String orderId) {
-		final list = [...state];
-		final idx = list.indexWhere((o) => o.id == orderId);
-		if (idx < 0) return;
-		final o = list[idx];
-		ref.read(maintenanceHistoryProvider.notifier).registrarRetiro(o);
-		list.removeAt(idx);
-		state = list;
+	Future<void> refresh() async {
+		state = const AsyncValue.loading();
+		state = await AsyncValue.guard(
+			() => ref.read(maintenanceOrdersRepositoryProvider).fetchSupervisorActive(),
+		);
+	}
+
+	Future<void> supervisorDecideStock({
+		required String orderId,
+		required bool hayStock,
+		String? note,
+	}) async {
+		final list = state.value;
+		MaintenanceOrder? orden;
+		if (list != null) {
+			for (final o in list) {
+				if (o.id == orderId) {
+					orden = o;
+					break;
+				}
+			}
+		}
+		final repo = ref.read(maintenanceOrdersRepositoryProvider);
+		await repo.supervisorDecideStock(
+			orderId: orderId,
+			hayStock: hayStock,
+			note: note,
+		);
+		final destinatario = orden?.createdBy;
+		if (destinatario != null && destinatario.isNotEmpty) {
+			try {
+				await repo.insertOrderNotification(
+					userId: destinatario,
+					orderId: orderId,
+					kind: hayStock ? "stock_ok_retiro" : "derivado_panol",
+					title: hayStock ? "Podés retirar el pedido" : "Pedido en gestión con pañol",
+					body: hayStock
+							? "${orden!.numeroOrden}: hay stock según catálogo. Pasá a retirar cuando puedas."
+							: "${orden!.numeroOrden}: no hay stock suficiente en depósito automático. Pañol lo gestionará; estará disponible a la brevedad.",
+				);
+			} catch (_) {
+				// No bloquear el flujo si la tabla de avisos aún no existe en el proyecto remoto.
+			}
+		}
+		ref.invalidate(supervisorMaintenanceHistoryProvider);
+		await refresh();
+	}
+
+	/// Cierra pedido con stock ya confirmado (retiro en planta).
+	Future<void> registrarRetiro(String orderId) async {
+		final list = state.value;
+		if (list == null) return;
+		MaintenanceOrder? orden;
+		for (final o in list) {
+			if (o.id == orderId) {
+				orden = o;
+				break;
+			}
+		}
+		if (orden == null) return;
+		await ref.read(maintenanceOrdersRepositoryProvider).markCompleted(orderId);
+		ref.invalidate(supervisorMaintenanceHistoryProvider);
+		await refresh();
 	}
 }
+
+/// Cantidad de pedidos en **pending_supervisor** (pendientes de decisión del supervisor).
+/// Sigue en tiempo real a [maintenanceOrdersProvider] (tick Realtime).
+final supervisorPendingMaintenanceBadgeProvider = Provider<int>((ref) {
+	final async = ref.watch(maintenanceOrdersProvider);
+	return async.maybeWhen(
+		data: (list) => list
+			.where(
+				(o) => o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor,
+			)
+			.length,
+		orElse: () => 0,
+	);
+});

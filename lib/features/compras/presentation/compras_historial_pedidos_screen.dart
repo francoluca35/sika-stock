@@ -61,112 +61,73 @@ class _ComprasHistorialPedidosScreenState
 	final _buscarCtrl = TextEditingController();
 	_PrioridadPedido? _filtroPrioridad;
 	int _paginaActual = 0;
-	static const int _itemsPorPagina = 5;
+	static const int _itemsPorPagina = 10;
 
 	final Map<String, _EstadoAvisoPedido> _estadoAvisoPorOrden = {};
 
 	_EstadoAvisoPedido _estadoAviso(_SolicitudCompraRow row) =>
 			_estadoAvisoPorOrden[row.numeroOrden] ?? _EstadoAvisoPedido.pendiente;
 
-	static List<_SolicitudCompraRow> _demo() {
-		return [
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0001",
-				producto: "Filtro de aire",
-				cantidad: 10,
-				prioridad: _PrioridadPedido.alta,
-				fecha: DateTime(2026, 5, 2),
-				sectorSolicitante: "Producción — Línea 2",
-				solicitante: "María González",
-				observaciones:
-						"Repuesto crítico. Mismo fabricante que el stock anterior (referencia en almacén A-12).",
-				codigoInterno: "MAT-FLT-001",
-				unidadMedida: "unid.",
-				imagenUrl: "https://picsum.photos/seed/sika_oc1/640/400",
-			),
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0002",
-				producto: "Aceite hidráulico",
-				cantidad: 20,
-				prioridad: _PrioridadPedido.media,
-				fecha: DateTime(2026, 5, 1),
-				sectorSolicitante: "Mantenimiento",
-				solicitante: "Carlos Ruiz",
-				observaciones: "ISO VG 46. Entrega en bidones de 20 L.",
-				codigoInterno: "LUB-HYD-046",
-				unidadMedida: "L",
-			),
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0003",
-				producto: "Rodamiento 6205",
-				cantidad: 15,
-				prioridad: _PrioridadPedido.baja,
-				fecha: DateTime(2026, 4, 28),
-				sectorSolicitante: "Taller mecánico",
-				solicitante: "Ana Ferreyra",
-				codigoInterno: "ROD-6205-2RS",
-				unidadMedida: "unid.",
-				imagenUrl: "https://picsum.photos/seed/sika_oc3/640/400",
-			),
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0004",
-				producto: "Casco seguridad",
-				cantidad: 8,
-				prioridad: _PrioridadPedido.alta,
-				fecha: DateTime(2026, 4, 25),
-				sectorSolicitante: "Higiene y seguridad",
-				solicitante: "Lucía Pérez",
-				observaciones: "Clase E. Talle M y L por igual si es posible.",
-				codigoInterno: "EPP-CAS-E",
-				unidadMedida: "unid.",
-			),
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0005",
-				producto: "Guantes nitrilo L",
-				cantidad: 50,
-				prioridad: _PrioridadPedido.media,
-				fecha: DateTime(2026, 4, 22),
-				sectorSolicitante: "Laboratorio",
-				solicitante: "Diego Martín",
-				codigoInterno: "EPP-GNT-L",
-				unidadMedida: "par",
-			),
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0006",
-				producto: "Cable flexible 2,5 mm²",
-				cantidad: 100,
-				prioridad: _PrioridadPedido.baja,
-				fecha: DateTime(2026, 4, 20),
-				sectorSolicitante: "Instalaciones",
-				solicitante: "Fernando Costa",
-				observaciones: "Color negro, H07V-K.",
-				codigoInterno: "EL-CAB-2.5",
-				unidadMedida: "m",
-				imagenUrl: "https://picsum.photos/seed/sika_oc6/640/400",
-			),
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0007",
-				producto: "Grasa litio EP2",
-				cantidad: 12,
-				prioridad: _PrioridadPedido.alta,
-				fecha: DateTime(2026, 4, 18),
-				sectorSolicitante: "Mantenimiento",
-				solicitante: "Carlos Ruiz",
-				codigoInterno: "LUB-GRS-EP2",
-				unidadMedida: "kg",
-			),
-			_SolicitudCompraRow(
-				numeroOrden: "OC-0008",
-				producto: "Llave allen 10 mm",
-				cantidad: 6,
-				prioridad: _PrioridadPedido.media,
-				fecha: DateTime(2026, 4, 15),
-				sectorSolicitante: "Taller mecánico",
-				solicitante: "Ana Ferreyra",
-				codigoInterno: "HERR-ALL-10",
-				unidadMedida: "unid.",
-			),
+	static final List<String> _productosDemo = [
+		"Filtro de aire",
+		"Aceite hidráulico",
+		"Rodamiento 6205",
+		"Casco seguridad",
+		"Guantes nitrilo L",
+		"Cable flexible 2,5 mm²",
+		"Grasa litio EP2",
+		"Llave allen 10 mm",
+		"Perno hexagonal M16",
+		"Chaleco reflectivo XL",
+	];
+
+	static final List<String> _sectoresDemo = [
+		"Producción — Línea 2",
+		"Mantenimiento",
+		"Taller mecánico",
+		"Higiene y seguridad",
+		"Laboratorio",
+		"Instalaciones",
+	];
+
+	static final List<String> _solicitantesDemo = [
+		"María González",
+		"Carlos Ruiz",
+		"Ana Ferreyra",
+		"Lucía Pérez",
+		"Diego Martín",
+		"Fernando Costa",
+	];
+
+	static List<_SolicitudCompraRow> _generarDemo() {
+		final out = <_SolicitudCompraRow>[];
+		const prioridades = [
+			_PrioridadPedido.alta,
+			_PrioridadPedido.media,
+			_PrioridadPedido.baja,
 		];
+		const unidades = ["unid.", "L", "m", "kg", "par"];
+		for (var i = 0; i < 60; i++) {
+			final base = DateTime(2026, 5, 12).subtract(Duration(days: i % 55));
+			out.add(
+				_SolicitudCompraRow(
+					numeroOrden: "OC-${(i + 1).toString().padLeft(4, "0")}",
+					producto: _productosDemo[i % _productosDemo.length],
+					cantidad: 5 + (i % 40),
+					prioridad: prioridades[i % prioridades.length],
+					fecha: base,
+					sectorSolicitante: _sectoresDemo[i % _sectoresDemo.length],
+					solicitante: _solicitantesDemo[i % _solicitantesDemo.length],
+					observaciones: i % 4 == 0 ? "Observación de ejemplo para el ítem $i." : null,
+					codigoInterno: i % 3 == 0 ? "MAT-DEMO-${(i % 100).toString().padLeft(3, "0")}" : null,
+					unidadMedida: unidades[i % unidades.length],
+					imagenUrl: i % 5 == 0
+							? "https://picsum.photos/seed/sika_ped$i/640/400"
+							: null,
+				),
+			);
+		}
+		return out;
 	}
 
 	@override
@@ -195,6 +156,39 @@ class _ComprasHistorialPedidosScreenState
 		return "${d.day.toString().padLeft(2, "0")}/"
 			"${d.month.toString().padLeft(2, "0")}/"
 			"${d.year}";
+	}
+
+	Widget _rowFechaMovil(IconData icon, String etiqueta, String texto) {
+		return Row(
+			crossAxisAlignment: CrossAxisAlignment.start,
+			children: [
+				Icon(icon, size: 18, color: Colors.grey.shade700),
+				const SizedBox(width: 10),
+				Expanded(
+					child: Column(
+						crossAxisAlignment: CrossAxisAlignment.start,
+						children: [
+							Text(
+								etiqueta,
+								style: TextStyle(
+									fontSize: 12,
+									color: Colors.grey.shade600,
+								),
+							),
+							const SizedBox(height: 2),
+							Text(
+								texto,
+								style: const TextStyle(
+									fontWeight: FontWeight.w600,
+									fontSize: 14,
+									color: Colors.black87,
+								),
+							),
+						],
+					),
+				),
+			],
+		);
 	}
 
 	void _mostrarSnackOrdenEmitida(_SolicitudCompraRow row) {
@@ -380,6 +374,151 @@ class _ComprasHistorialPedidosScreenState
 		);
 	}
 
+	void _mostrarDetallePedidoSheet(_SolicitudCompraRow row) {
+		showModalBottomSheet<void>(
+			context: context,
+			isScrollControlled: true,
+			showDragHandle: true,
+			backgroundColor: AppTokens.whiteSurface,
+			shape: const RoundedRectangleBorder(
+				borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+			),
+			builder: (ctx) {
+				final maxH = MediaQuery.sizeOf(ctx).height * 0.55;
+				return StatefulBuilder(
+					builder: (ctx, setModal) {
+						return Padding(
+							padding: EdgeInsets.only(
+								left: 20,
+								right: 20,
+								top: 8,
+								bottom: MediaQuery.paddingOf(ctx).bottom + 16,
+							),
+							child: Column(
+								mainAxisSize: MainAxisSize.min,
+								crossAxisAlignment: CrossAxisAlignment.stretch,
+								children: [
+									Text(
+										row.producto,
+										style: const TextStyle(
+											fontWeight: FontWeight.bold,
+											fontSize: 17,
+											color: Colors.black87,
+										),
+									),
+									const SizedBox(height: 4),
+									Text(
+										row.numeroOrden,
+										style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+									),
+									const SizedBox(height: 8),
+									Text(
+										"Solicitud y seguimiento de avisos",
+										style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+									),
+									const SizedBox(height: 12),
+									ConstrainedBox(
+										constraints: BoxConstraints(maxHeight: maxH),
+										child: SingleChildScrollView(
+											child: Column(
+												crossAxisAlignment: CrossAxisAlignment.start,
+												children: [
+													_rowFechaMovil(
+														Icons.edit_calendar_outlined,
+														"Fecha solicitud",
+														_fmtFecha(row.fecha),
+													),
+													const SizedBox(height: 8),
+													_rowFechaMovil(
+														Icons.inventory_outlined,
+														"Cantidad",
+														"${row.cantidad} ${row.unidadMedida}",
+													),
+													const SizedBox(height: 8),
+													_rowFechaMovil(
+														Icons.corporate_fare_outlined,
+														"Sector",
+														row.sectorSolicitante,
+													),
+													const SizedBox(height: 8),
+													_rowFechaMovil(
+														Icons.person_outline,
+														"Solicitante",
+														row.solicitante,
+													),
+													const SizedBox(height: 8),
+													_rowFechaMovil(
+														Icons.flag_outlined,
+														"Prioridad",
+														_prioridadLabel(row.prioridad),
+													),
+													const SizedBox(height: 8),
+													_rowFechaMovil(
+														Icons.notifications_active_outlined,
+														"Estado avisos",
+														_estadoAvisoDetalleText(row),
+													),
+													if (row.codigoInterno != null &&
+															row.codigoInterno!.trim().isNotEmpty) ...[
+														const SizedBox(height: 8),
+														_rowFechaMovil(
+															Icons.tag_outlined,
+															"Código interno",
+															row.codigoInterno!.trim(),
+														),
+													],
+													if (row.observaciones != null &&
+															row.observaciones!.trim().isNotEmpty) ...[
+														const SizedBox(height: 8),
+														_rowFechaMovil(
+															Icons.notes_outlined,
+															"Observaciones",
+															row.observaciones!.trim(),
+														),
+													],
+												],
+											),
+										),
+									),
+									const SizedBox(height: 16),
+									Wrap(
+										spacing: 8,
+										runSpacing: 8,
+										children: [
+											OutlinedButton.icon(
+												onPressed: () {
+													Navigator.pop(ctx);
+													WidgetsBinding.instance.addPostFrameCallback((_) {
+														if (mounted) _ver(row);
+													});
+												},
+												icon: const Icon(Icons.visibility_outlined, size: 20),
+												label: const Text("Ver todo"),
+												style: OutlinedButton.styleFrom(
+													foregroundColor: Colors.black87,
+													side: const BorderSide(color: Colors.black54),
+													padding: const EdgeInsets.symmetric(
+														horizontal: 12,
+														vertical: 12,
+													),
+												),
+											),
+											_widgetBotonAviso(
+												row,
+												compact: false,
+												onAfter: () => setModal(() {}),
+											),
+										],
+									),
+								],
+							),
+						);
+					},
+				);
+			},
+		);
+	}
+
 	Future<void> _mostrarFiltroPrioridad() async {
 		await showModalBottomSheet<void>(
 			context: context,
@@ -506,33 +645,19 @@ class _ComprasHistorialPedidosScreenState
 				),
 			);
 
-	ButtonStyle get _styleVerTabla => OutlinedButton.styleFrom(
-				foregroundColor: Colors.black87,
-				side: const BorderSide(color: Colors.black54, width: 1.25),
-				padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-				minimumSize: const Size(92, 46),
-				tapTargetSize: MaterialTapTargetSize.padded,
-				textStyle: const TextStyle(
-					fontWeight: FontWeight.w700,
-					fontSize: 13,
-				),
-			);
-
-	Widget _botonVerTabla(_SolicitudCompraRow row) {
-		return OutlinedButton.icon(
-			onPressed: () => _ver(row),
-			icon: const Icon(Icons.visibility_outlined, size: 20),
-			label: const Text("Ver"),
-			style: _styleVerTabla,
-		);
-	}
-
-	Widget _widgetBotonAviso(_SolicitudCompraRow row, {required bool compact}) {
+	Widget _widgetBotonAviso(
+		_SolicitudCompraRow row, {
+		required bool compact,
+		VoidCallback? onAfter,
+	}) {
 		final estado = _estadoAviso(row);
 		switch (estado) {
 			case _EstadoAvisoPedido.pendiente:
 				return FilledButton.icon(
-					onPressed: () => _onPasoAviso(row),
+					onPressed: () {
+						_onPasoAviso(row);
+						onAfter?.call();
+					},
 					icon: const Icon(Icons.campaign, size: 22, color: Colors.black87),
 					label: const Text("Aviso"),
 					style: compact
@@ -541,7 +666,10 @@ class _ComprasHistorialPedidosScreenState
 				);
 			case _EstadoAvisoPedido.ordenEmitidaAvisada:
 				return FilledButton.icon(
-					onPressed: () => _onPasoAviso(row),
+					onPressed: () {
+						_onPasoAviso(row);
+						onAfter?.call();
+					},
 					icon: const Icon(Icons.inventory_2, size: 22, color: Colors.white),
 					label: const Text("Avisar llegada"),
 					style: compact
@@ -583,86 +711,64 @@ class _ComprasHistorialPedidosScreenState
 				borderRadius: BorderRadius.circular(AppTokens.radiusMd),
 				side: const BorderSide(color: AppTokens.greyBorder),
 			),
-			child: Padding(
-				padding: const EdgeInsets.all(14),
-				child: Column(
-					crossAxisAlignment: CrossAxisAlignment.stretch,
-					children: [
-						Row(
-							crossAxisAlignment: CrossAxisAlignment.start,
-							children: [
-								Expanded(
-									child: Text(
-										row.numeroOrden,
-										style: const TextStyle(
-											fontWeight: FontWeight.w700,
-											fontSize: 16,
-											color: Colors.black87,
+			child: InkWell(
+				onTap: () => _mostrarDetallePedidoSheet(row),
+				borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+				child: Padding(
+					padding: const EdgeInsets.all(14),
+					child: Column(
+						crossAxisAlignment: CrossAxisAlignment.stretch,
+						children: [
+							Row(
+								children: [
+									Expanded(
+										child: Text(
+											row.producto,
+											style: const TextStyle(
+												fontWeight: FontWeight.w700,
+												fontSize: 16,
+												color: Colors.black87,
+											),
 										),
 									),
-								),
-								_prioridadBadge(row.prioridad),
-							],
-						),
-						const SizedBox(height: 8),
-						Text(
-							row.producto,
-							style: TextStyle(fontSize: 14, color: Colors.grey.shade800),
-						),
-						const SizedBox(height: 10),
-						Row(
-							children: [
-								Icon(
-									Icons.calendar_today_outlined,
-									size: 16,
-									color: Colors.grey.shade700,
-								),
-								const SizedBox(width: 6),
-								Text(
-									_fmtFecha(row.fecha),
-									style: TextStyle(
-										fontSize: 13,
+									Icon(
+										Icons.chevron_right,
 										color: Colors.grey.shade700,
 									),
-								),
-								const Spacer(),
-								Text(
-									"Cant. ${row.cantidad}",
-									style: const TextStyle(
-										fontWeight: FontWeight.w600,
-										fontSize: 13,
-									),
-								),
-							],
-						),
-						const SizedBox(height: 12),
-						Wrap(
-							spacing: 8,
-							runSpacing: 8,
-							alignment: WrapAlignment.end,
-							children: [
-								OutlinedButton.icon(
-									onPressed: () => _ver(row),
-									icon: const Icon(Icons.visibility_outlined, size: 22),
-									label: const Text("Ver"),
-									style: OutlinedButton.styleFrom(
-										foregroundColor: Colors.black87,
-										side: const BorderSide(color: Colors.black54, width: 1.25),
-										padding: const EdgeInsets.symmetric(
-											horizontal: 18,
-											vertical: 14,
-										),
-										minimumSize: const Size(100, 48),
-										textStyle: const TextStyle(
-											fontWeight: FontWeight.w700,
-											fontSize: 14,
-										),
-									),
-								),
-								_widgetBotonAviso(row, compact: false),
-							],
-						),
-					],
+								],
+							),
+							const SizedBox(height: 12),
+							_rowFechaMovil(
+								Icons.receipt_long_outlined,
+								"N° orden",
+								row.numeroOrden,
+							),
+							const SizedBox(height: 8),
+							_rowFechaMovil(
+								Icons.edit_calendar_outlined,
+								"Fecha solicitud",
+								_fmtFecha(row.fecha),
+							),
+							const SizedBox(height: 8),
+							_rowFechaMovil(
+								Icons.inventory_outlined,
+								"Cantidad",
+								"${row.cantidad} ${row.unidadMedida}",
+							),
+							const SizedBox(height: 8),
+							_rowFechaMovil(
+								Icons.corporate_fare_outlined,
+								"Sector",
+								row.sectorSolicitante,
+							),
+							const SizedBox(height: 8),
+							_rowFechaMovil(
+								Icons.flag_outlined,
+								"Prioridad",
+								_prioridadLabel(row.prioridad),
+							),
+						],
+					),
 				),
 			),
 		);
@@ -672,8 +778,11 @@ class _ComprasHistorialPedidosScreenState
 		List<_SolicitudCompraRow> paginaItems,
 		double minTableWidth,
 	) {
-		// Deja ~660px a orden, cantidad, prioridad, fecha y acciones (botones más grandes).
-		final productoAncho = math.max(140.0, minTableWidth - 660);
+		const reservaSinProducto = 640.0;
+		final productoAncho = math.max(
+			160.0,
+			minTableWidth - reservaSinProducto,
+		);
 		return Scrollbar(
 			child: SingleChildScrollView(
 				scrollDirection: Axis.horizontal,
@@ -684,28 +793,48 @@ class _ComprasHistorialPedidosScreenState
 								headingRowColor: WidgetStateProperty.all(
 									AppTokens.yellowHeader,
 								),
-								dataRowMinHeight: 64,
-								dataRowMaxHeight: 96,
+								dataRowMinHeight: 48,
+								dataRowMaxHeight: 64,
 								horizontalMargin: 12,
-								columnSpacing: 12,
+								columnSpacing: 14,
 								columns: const [
-									DataColumn(label: Text("N° ORDEN")),
+									DataColumn(label: Text("FECHA")),
 									DataColumn(label: Text("PRODUCTO")),
+									DataColumn(label: Text("N° ORDEN")),
 									DataColumn(label: Text("CANTIDAD"), numeric: true),
 									DataColumn(label: Text("PRIORIDAD")),
-									DataColumn(label: Text("FECHA")),
-									DataColumn(label: Text("ACCIONES")),
+									DataColumn(
+										label: Tooltip(
+											message: "Detalle y avisos",
+											child: Padding(
+												padding: EdgeInsets.only(left: 4),
+												child: Icon(
+													Icons.alt_route,
+													size: 20,
+													color: Colors.black87,
+												),
+											),
+										),
+									),
 								],
 								rows: [
 									for (final row in paginaItems)
 										DataRow(
 											cells: [
-												DataCell(Text(
-													row.numeroOrden,
-													style: const TextStyle(
-														fontWeight: FontWeight.w600,
+												DataCell(
+													Row(
+														mainAxisSize: MainAxisSize.min,
+														children: [
+															Icon(
+																Icons.calendar_today_outlined,
+																size: 16,
+																color: Colors.grey.shade800,
+															),
+															const SizedBox(width: 6),
+															Text(_fmtFecha(row.fecha)),
+														],
 													),
-												)),
+												),
 												DataCell(
 													SizedBox(
 														width: productoAncho,
@@ -715,21 +844,35 @@ class _ComprasHistorialPedidosScreenState
 														),
 													),
 												),
-												DataCell(Text("${row.cantidad}")),
-												DataCell(_prioridadBadge(row.prioridad)),
-												DataCell(Text(_fmtFecha(row.fecha))),
 												DataCell(
-													Padding(
-														padding: const EdgeInsets.symmetric(vertical: 6),
-														child: Row(
-															mainAxisSize: MainAxisSize.min,
-															crossAxisAlignment:
-																	CrossAxisAlignment.center,
-															children: [
-																_botonVerTabla(row),
-																const SizedBox(width: 10),
-																_widgetBotonAviso(row, compact: true),
-															],
+													Text(
+														row.numeroOrden,
+														style: const TextStyle(
+															fontWeight: FontWeight.w600,
+														),
+													),
+												),
+												DataCell(Text("${row.cantidad} ${row.unidadMedida}")),
+												DataCell(_prioridadBadge(row.prioridad)),
+												DataCell(
+													SizedBox(
+														width: 52,
+														child: Align(
+															alignment: Alignment.centerRight,
+															child: IconButton(
+																padding: EdgeInsets.zero,
+																constraints: const BoxConstraints(
+																	minWidth: 48,
+																	minHeight: 40,
+																),
+																icon: const Icon(
+																	Icons.chevron_right,
+																	color: Colors.black87,
+																),
+																tooltip: "Detalle y avisos",
+																onPressed: () =>
+																		_mostrarDetallePedidoSheet(row),
+															),
 														),
 													),
 												),
@@ -745,7 +888,7 @@ class _ComprasHistorialPedidosScreenState
 
 	@override
 	Widget build(BuildContext context) {
-		final todos = _demo();
+		final todos = _generarDemo();
 		final filtrados = _filtrar(todos);
 		final totalPaginas = filtrados.isEmpty
 			? 1
@@ -801,19 +944,20 @@ class _ComprasHistorialPedidosScreenState
 										),
 									),
 								);
-								final filtro = OutlinedButton(
+								final filtro = OutlinedButton.icon(
 									onPressed: _mostrarFiltroPrioridad,
+									icon: const Icon(Icons.filter_list, size: 20),
+									label: const Text(
+										"FILTRAR",
+										style: TextStyle(fontWeight: FontWeight.bold),
+									),
 									style: OutlinedButton.styleFrom(
 										foregroundColor: Colors.black87,
 										side: const BorderSide(color: Colors.black54),
 										padding: const EdgeInsets.symmetric(
-											horizontal: 14,
+											horizontal: 12,
 											vertical: 12,
 										),
-									),
-									child: const Text(
-										"FILTRAR",
-										style: TextStyle(fontWeight: FontWeight.bold),
 									),
 								);
 								if (stackToolbar) {
@@ -837,19 +981,11 @@ class _ComprasHistorialPedidosScreenState
 							},
 						),
 					),
-					Padding(
-						padding: ComprasScreenMetrics.horizontalPadding(context),
-						child: Text(
-							"Solicitudes de otros sectores (sin alta de OC desde esta app).",
-							style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-						),
-					),
-					const SizedBox(height: 8),
 					Expanded(
 						child: filtrados.isEmpty
 							? Center(
 									child: Text(
-										"No hay pedidos con los filtros actuales.",
+										"No hay pedidos con la búsqueda o filtros actuales.",
 										style: TextStyle(color: Colors.grey.shade600),
 									),
 								)
