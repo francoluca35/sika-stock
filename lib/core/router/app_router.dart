@@ -4,6 +4,8 @@ import "package:go_router/go_router.dart";
 
 import "go_router_refresh.dart";
 import "slide_transition_page.dart";
+import "../../features/compras/presentation/compras_historial_compras_screen.dart";
+import "../../features/compras/presentation/compras_historial_pedidos_screen.dart";
 import "../../features/admin/presentation/create_users_screen.dart";
 import "../../features/admin/presentation/users_list_screen.dart";
 import "../../features/auth/application/auth_providers.dart";
@@ -50,6 +52,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 			GoRoute(
 				path: "/home",
 				builder: (context, state) => const HomeScreen(),
+			),
+			GoRoute(
+				path: "/compras/historial-pedidos",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const ComprasHistorialPedidosScreen(),
+				),
+			),
+			GoRoute(
+				path: "/compras/historial-compras",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const ComprasHistorialComprasScreen(),
+				),
 			),
 			GoRoute(
 				path: "/admin/nuevos-usuarios",

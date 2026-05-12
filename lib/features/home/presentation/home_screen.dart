@@ -5,6 +5,7 @@ import "../../../core/theme/app_tokens.dart";
 import "../../admin/presentation/admin_panel_screen.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
+import "../../compras/presentation/compras_home_screen.dart";
 import "../../panol/presentation/panol_home_screen.dart";
 import "../../supervisor/presentation/supervisor_home_screen.dart";
 
@@ -17,6 +18,7 @@ class HomeScreen extends ConsumerWidget {
 
 	static bool _isSupervisor(AppRole? r) => r == AppRole.supervisor;
 	static bool _isPanol(AppRole? r) => r == AppRole.panol;
+	static bool _isCompras(AppRole? r) => r == AppRole.compras;
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
@@ -32,6 +34,9 @@ class HomeScreen extends ConsumerWidget {
 				}
 				if (_isPanol(p?.rol)) {
 					return const PanolHomeScreen();
+				}
+				if (_isCompras(p?.rol)) {
+					return const ComprasHomeScreen();
 				}
 				return Scaffold(
 					appBar: AppBar(
