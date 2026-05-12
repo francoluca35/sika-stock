@@ -1,25 +1,30 @@
 import "package:flutter/foundation.dart";
 import "package:flutter/material.dart";
 import "package:flutter/services.dart";
+import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 import "package:image_picker/image_picker.dart" show ImagePicker, ImageSource;
 
 import "../../../core/images/order_photo_compress.dart";
 import "../../../core/theme/app_tokens.dart";
+import "../../auth/application/auth_providers.dart";
+import "../../auth/domain/app_role.dart";
+import "../../supervisor/application/maintenance_orders_provider.dart";
+import "../application/mis_pedidos_mantenimiento_provider.dart";
 import "../../auth/presentation/widgets/auth_field_styles.dart";
 import "../domain/order_priority.dart";
 import "widgets/mobile_sheet_select_field.dart";
 import "widgets/order_hub_bottom_bar.dart";
 
 /// Formulario **Hacer pedido** (potenciamiento) según mockup.
-class PlaceOrderScreen extends StatefulWidget {
-  const PlaceOrderScreen({super.key});
+class PlaceOrderScreen extends ConsumerStatefulWidget {
+	const PlaceOrderScreen({super.key});
 
-  @override
-  State<PlaceOrderScreen> createState() => _PlaceOrderScreenState();
+	@override
+	ConsumerState<PlaceOrderScreen> createState() => _PlaceOrderScreenState();
 }
 
-class _PlaceOrderScreenState extends State<PlaceOrderScreen> {
+class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nombreCtrl = TextEditingController();
   final _cantidadCtrl = TextEditingController();
@@ -136,24 +141,67 @@ class _PlaceOrderScreenState extends State<PlaceOrderScreen> {
 	}
 
 	Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+		if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _loading = true);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-
-		setState(() => _loading = false);
-
-		final fotoTxt = _photoJpeg != null
-			? " · foto ~${(_photoJpeg!.length / 1024).toStringAsFixed(1)} KB"
-			: "";
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(
-				content: Text(
-					"Pedido preparado: ${_nombreCtrl.text.trim()} · ${_cantidadCtrl.text} · $_tipoProducto · ${_prioridad!.label} · ${_destinoCtrl.text.trim()}$fotoTxt",
+		final perfil = await ref.read(currentProfileProvider.future);
+		if (!appRolePuedeCrearPedidoMantenimiento(perfil?.rol)) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(
+					content: Text(
+						"Solo Mantenimiento, Admin o Superadmin pueden enviar este pedido al supervisor.",
+					),
 				),
-			),
-		);
+			);
+			return;
+		}
+
+		setState(() => _loading = true);
+		try {
+			final nombre = perfil!.nombre?.trim();
+			final usuario = perfil.usuario?.trim();
+			final display = (nombre != null && nombre.isNotEmpty)
+					? nombre
+					: (usuario != null && usuario.isNotEmpty)
+							? usuario
+							: "Mantenimiento";
+			final solicitanteDisplay =
+					"$display · ${perfil.rol?.label ?? "MANTENIMIENTO"}";
+
+			await ref.read(maintenanceOrdersRepositoryProvider).createOrder(
+						solicitanteDisplay: solicitanteDisplay,
+						productName: _nombreCtrl.text.trim(),
+						quantity: int.parse(_cantidadCtrl.text.trim()),
+						productType: _tipoProducto!,
+						priority: _prioridad!.dbValue,
+						destination: _destinoCtrl.text.trim(),
+					);
+			ref.invalidate(maintenanceOrdersProvider);
+			ref.invalidate(misPedidosMantenimientoProvider);
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(
+					content: Text(
+						"Pedido enviado. El supervisor lo revisará y definirá si hay stock.",
+					),
+				),
+			);
+			_nombreCtrl.clear();
+			_cantidadCtrl.clear();
+			_destinoCtrl.clear();
+			setState(() {
+				_tipoProducto = null;
+				_prioridad = null;
+				_photoJpeg = null;
+			});
+		} catch (e) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudo guardar el pedido: $e")),
+			);
+		} finally {
+			if (mounted) setState(() => _loading = false);
+		}
 	}
 
   @override

@@ -1,4 +1,19 @@
 import "../../stock/domain/stock_product.dart";
+import "../domain/maintenance_order.dart";
+
+/// Resultado de comparar el pedido con el catálogo (mejor coincidencia y cantidad).
+({bool haySuficiente, StockProduct? match, int disponible}) analizarStockPedido(
+	MaintenanceOrder pedido,
+	List<StockProduct> catalog,
+) {
+	final matches = stockSimilarToPedido(pedido.producto, catalog);
+	if (matches.isEmpty) {
+		return (haySuficiente: false, match: null, disponible: 0);
+	}
+	final best = matches.first;
+	final ok = best.cantidad >= pedido.quantity;
+	return (haySuficiente: ok, match: best, disponible: best.cantidad);
+}
 
 /// Coincidencias entre el texto del pedido de mantenimiento y el catálogo de stock.
 ///

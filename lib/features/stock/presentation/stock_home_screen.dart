@@ -6,6 +6,7 @@ import "../../orders/presentation/widgets/order_hub_bottom_bar.dart";
 import "widgets/stock_screen_header.dart";
 
 /// Hub **Stock**: AGREGAR / HISTORIAL / ALERTAS / CATEGORÍAS + barra inferior Pedido · Historial · Perfil.
+/// Ruta dedicada `/stock`; Mantenimiento entra por su propia pantalla en `/home`.
 class StockHomeScreen extends StatelessWidget {
 	const StockHomeScreen({super.key});
 
@@ -115,7 +116,7 @@ class StockHomeScreen extends StatelessWidget {
 						bottomPadding: bottomInset,
 						selectedIndex: null,
 						onPedido: () => context.push("/pedidos/nuevo"),
-						onHistorial: () => _soon(context, "Historial de pedidos"),
+						onHistorial: () => context.push("/pedidos/mis-pedidos"),
 						onPerfil: () => _soon(context, "Perfil"),
 					),
 				],

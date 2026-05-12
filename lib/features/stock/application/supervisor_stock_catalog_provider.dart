@@ -85,4 +85,22 @@ class SupervisorStockCatalogNotifier extends Notifier<List<StockProduct>> {
 
 	@override
 	List<StockProduct> build() => _demoSeed();
+
+	/// Reemplaza un ítem por `id` (misma fuente en memoria hasta Supabase).
+	void replaceProduct(StockProduct updated) {
+		final i = state.indexWhere((e) => e.id == updated.id);
+		if (i < 0) return;
+		final next = List<StockProduct>.from(state);
+		next[i] = updated;
+		state = next;
+	}
+
+	/// Quita todos los ítems cuyo `id` esté en [ids].
+	void removeByIds(Set<String> ids) {
+		if (ids.isEmpty) return;
+		state = [
+			for (final x in state)
+				if (!ids.contains(x.id)) x,
+		];
+	}
 }

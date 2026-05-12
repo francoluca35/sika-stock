@@ -6,6 +6,8 @@ import "../../../core/theme/app_tokens.dart";
 import "../../admin/presentation/widgets/admin_shell_bottom_bar.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
+import "../application/maintenance_orders_provider.dart";
+import "../application/maintenance_orders_realtime_provider.dart";
 
 /// Pantalla inicial **Supervisor**: accesos rápidos a pedidos, stock y seguimiento.
 class SupervisorHomeScreen extends ConsumerWidget {
@@ -39,12 +41,15 @@ class SupervisorHomeScreen extends ConsumerWidget {
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
+		ref.watch(maintenanceOrdersRealtimeTickProvider);
 		final profileAsync = ref.watch(currentProfileProvider);
 
 		return profileAsync.when(
 			data: (p) {
 				final nombre = _welcomeName(p);
 				final bottomInset = MediaQuery.paddingOf(context).bottom;
+				final pedidosPendientesSupervisor =
+					ref.watch(supervisorPendingMaintenanceBadgeProvider);
 				return Scaffold(
 					backgroundColor: AppTokens.surfacePage,
 					body: Column(
@@ -128,6 +133,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
 												),
 												title: "PEDIDOS DE MANTENIMIENTO",
 												subtitle: "Gestionar solicitudes de mantenimiento",
+												badgeCount: pedidosPendientesSupervisor,
 												onTap: () => context.push(
 														"/supervisor/pedidos-mantenimiento",
 													),
@@ -161,7 +167,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
 												),
 												title: "SEGUIMIENTO",
 												subtitle: "Seguimiento de pedidos y órdenes",
-												onTap: () => _soon(context, "Seguimiento"),
+												onTap: () => context.push("/panol/seguimiento"),
 											),
 										],
 											),
@@ -328,6 +334,7 @@ class _SupervisorMenuCard extends StatelessWidget {
 		required this.title,
 		required this.subtitle,
 		required this.onTap,
+		this.badgeCount = 0,
 	});
 
 	final BoxDecoration leadingDecoration;
@@ -335,6 +342,9 @@ class _SupervisorMenuCard extends StatelessWidget {
 	final String title;
 	final String subtitle;
 	final VoidCallback onTap;
+
+	/// Pedidos nuevos pendientes de decisión (solo tarjeta mantenimiento).
+	final int badgeCount;
 
 	@override
 	Widget build(BuildContext context) {
@@ -389,15 +399,76 @@ class _SupervisorMenuCard extends StatelessWidget {
 										],
 									),
 								),
-								const Icon(
-									Icons.chevron_right,
-									color: Colors.black87,
-									size: 26,
-								),
+								badgeCount > 0
+									? _SupervisorMenuChevronBadge(count: badgeCount)
+									: const Icon(
+											Icons.chevron_right,
+											color: Colors.black87,
+											size: 26,
+										),
 							],
 						),
 					),
 				),
+			),
+		);
+	}
+}
+
+class _SupervisorMenuChevronBadge extends StatelessWidget {
+	const _SupervisorMenuChevronBadge({required this.count});
+
+	final int count;
+
+	String get _label {
+		if (count > 99) return "99+";
+		return "$count";
+	}
+
+	@override
+	Widget build(BuildContext context) {
+		return SizedBox(
+			width: 40,
+			height: 32,
+			child: Stack(
+				clipBehavior: Clip.none,
+				alignment: Alignment.center,
+				children: [
+					const Icon(
+						Icons.chevron_right,
+						color: Colors.black87,
+						size: 26,
+					),
+					Positioned(
+						right: -2,
+						top: -6,
+						child: Container(
+							constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+							padding: const EdgeInsets.symmetric(horizontal: 5),
+							decoration: const BoxDecoration(
+								color: AppTokens.redAction,
+								shape: BoxShape.circle,
+								boxShadow: [
+									BoxShadow(
+										color: Colors.black26,
+										blurRadius: 4,
+										offset: Offset(0, 1),
+									),
+								],
+							),
+							alignment: Alignment.center,
+							child: Text(
+								_label,
+								style: const TextStyle(
+									color: Colors.white,
+									fontSize: 11,
+									fontWeight: FontWeight.w800,
+									height: 1,
+								),
+							),
+						),
+					),
+				],
 			),
 		);
 	}

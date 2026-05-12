@@ -4,19 +4,13 @@ import "package:go_router/go_router.dart";
 import "package:intl/intl.dart";
 
 import "../../../core/theme/app_tokens.dart";
+import "../../panol/application/panol_forwarded_orders_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
+import "../../orders/application/mantenimiento_notificaciones_provider.dart";
 import "../application/maintenance_orders_provider.dart";
 import "../application/maintenance_stock_similarity.dart";
 import "../domain/maintenance_order.dart";
-
-bool _hayStockDisponibleParaPedido(
-  MaintenanceOrder o,
-  List<StockProduct> catalog,
-) {
-  final matches = stockSimilarToPedido(o.producto, catalog);
-  return hayStockDisponibleEnCoincidencias(matches);
-}
 
 /// Tabla de **pedidos de mantenimiento** para supervisor (lista mockup).
 class SupervisorMaintenanceOrdersScreen extends ConsumerStatefulWidget {
@@ -27,29 +21,33 @@ class SupervisorMaintenanceOrdersScreen extends ConsumerStatefulWidget {
 
   static final DateFormat _fechaFmt = DateFormat("dd/MM/yyyy HH:mm");
 
-  static String _estadoLabel(MaintenanceOrderStatus s) {
-    switch (s) {
-      case MaintenanceOrderStatus.pendiente:
-        return "PENDIENTE";
-      case MaintenanceOrderStatus.enviado:
-        return "ENVIADO";
-      case MaintenanceOrderStatus.enProceso:
-        return "EN PROCESO";
-      case MaintenanceOrderStatus.completado:
+  static String _workflowBadgeLabel(MaintenanceOrder o) {
+    switch (o.workflowStatus) {
+      case MaintenanceWorkflowStatus.pendingSupervisor:
+        return "ESPERA SUPERVISOR";
+      case MaintenanceWorkflowStatus.supervisorStockOk:
+        return "STOCK OK";
+      case MaintenanceWorkflowStatus.forwardedToPanol:
+        return "EN PAÑOL";
+      case MaintenanceWorkflowStatus.completed:
         return "COMPLETADO";
+      case MaintenanceWorkflowStatus.cancelled:
+        return "CANCELADO";
     }
   }
 
-  static (Color bg, Color fg) _estadoColors(MaintenanceOrderStatus s) {
-    switch (s) {
-      case MaintenanceOrderStatus.pendiente:
+  static (Color bg, Color fg) _workflowBadgeColors(MaintenanceOrder o) {
+    switch (o.workflowStatus) {
+      case MaintenanceWorkflowStatus.pendingSupervisor:
         return (AppTokens.yellowHeader, Colors.black87);
-      case MaintenanceOrderStatus.enviado:
+      case MaintenanceWorkflowStatus.supervisorStockOk:
         return (AppTokens.statusOk, Colors.white);
-      case MaintenanceOrderStatus.enProceso:
-        return (AppTokens.roleMantenimientoBg, Colors.white);
-      case MaintenanceOrderStatus.completado:
+      case MaintenanceWorkflowStatus.forwardedToPanol:
+        return (AppTokens.rolePanolBg, AppTokens.rolePanolFg);
+      case MaintenanceWorkflowStatus.completed:
         return (AppTokens.blackNav, Colors.white);
+      case MaintenanceWorkflowStatus.cancelled:
+        return (Colors.grey.shade700, Colors.white);
     }
   }
 
@@ -71,6 +69,8 @@ class SupervisorMaintenanceOrdersScreen extends ConsumerStatefulWidget {
 class _SupervisorMaintenanceOrdersScreenState
     extends ConsumerState<SupervisorMaintenanceOrdersScreen> {
   void _mostrarDetalle(BuildContext context, MaintenanceOrder o) {
+    final catalog = ref.read(supervisorStockCatalogProvider);
+    final analisis = analizarStockPedido(o, catalog);
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -82,7 +82,7 @@ class _SupervisorMaintenanceOrdersScreenState
       builder: (ctx) {
         final bottom = MediaQuery.paddingOf(ctx).bottom;
         final (ebg, efg) =
-            SupervisorMaintenanceOrdersScreen._estadoColors(o.estado);
+            SupervisorMaintenanceOrdersScreen._workflowBadgeColors(o);
         return Padding(
           padding: EdgeInsets.only(
             left: 20,
@@ -130,6 +130,22 @@ class _SupervisorMaintenanceOrdersScreenState
                   label: "Producto",
                   value: o.producto,
                 ),
+                _DetailRow(
+                  label: "Cantidad",
+                  value: "${o.quantity}",
+                ),
+                _DetailRow(
+                  label: "Tipo",
+                  value: o.productType,
+                ),
+                _DetailRow(
+                  label: "Prioridad",
+                  value: o.priority,
+                ),
+                _DetailRow(
+                  label: "Destino",
+                  value: o.destination,
+                ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(
@@ -150,8 +166,8 @@ class _SupervisorMaintenanceOrdersScreenState
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: _EstadoChip(
-                            label: SupervisorMaintenanceOrdersScreen._estadoLabel(
-                              o.estado,
+                            label: SupervisorMaintenanceOrdersScreen._workflowBadgeLabel(
+                              o,
                             ),
                             background: ebg,
                             foreground: efg,
@@ -229,6 +245,93 @@ class _SupervisorMaintenanceOrdersScreenState
                     ),
                   ),
                 ],
+                if (o.workflowStatus ==
+                    MaintenanceWorkflowStatus.pendingSupervisor) ...[
+                  const SizedBox(height: 16),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: analisis.haySuficiente
+                          ? const Color(0xFFE8F5E9)
+                          : Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: analisis.haySuficiente
+                            ? const Color(0xFF2E7D32)
+                            : Colors.orange.shade800,
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            analisis.haySuficiente
+                                ? "Stock en catálogo"
+                                : "Sin stock suficiente",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: analisis.haySuficiente
+                                  ? const Color(0xFF1B5E20)
+                                  : Colors.orange.shade900,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          if (analisis.match != null)
+                            Text(
+                              analisis.haySuficiente
+                                  ? "Coincidencia: ${analisis.match!.nombre} · Disponible: ${analisis.disponible} · Pedido: ${o.quantity} u."
+                                  : "Mejor coincidencia: ${analisis.match!.nombre} · Disponible: ${analisis.disponible} (se piden ${o.quantity} u.). Pedir a pañol.",
+                              style: TextStyle(
+                                fontSize: 13,
+                                height: 1.3,
+                                color: analisis.haySuficiente
+                                    ? const Color(0xFF2E7D32)
+                                    : Colors.orange.shade900,
+                              ),
+                            )
+                          else
+                            Text(
+                              "No hay coincidencia clara en catálogo. Pedir a pañol.",
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.orange.shade900,
+                              ),
+                            ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: analisis.haySuficiente
+                                        ? AppTokens.statusOk
+                                        : Colors.orange.shade800,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () async {
+                                    Navigator.of(ctx).pop();
+                                    await _decidirStock(
+                                      context,
+                                      o,
+                                      hayStock: analisis.haySuficiente,
+                                    );
+                                  },
+                                  child: Text(
+                                    analisis.haySuficiente ? "ENVIAR" : "PEDIR A PAÑOL",
+                                    style: const TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
               ],
             ),
@@ -238,46 +341,188 @@ class _SupervisorMaintenanceOrdersScreenState
     );
   }
 
-  void _retirarDesdeStock(BuildContext context, MaintenanceOrder o) {
-    ref.read(maintenanceOrdersProvider.notifier).registrarRetiro(o.id);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          "Retiro registrado. ${o.numeroOrden} pasó al historial.",
+  Widget _mobileFooterActions(
+    BuildContext context,
+    MaintenanceOrder o,
+    List<StockProduct> catalog,
+  ) {
+    final analisis = analizarStockPedido(o, catalog);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.start,
+      children: [
+        _TextActionButton(
+          label: "VER",
+          background: AppTokens.yellowHeader,
+          foreground: Colors.black87,
+          onPressed: () => _mostrarDetalle(context, o),
         ),
-      ),
+        if (o.workflowStatus ==
+            MaintenanceWorkflowStatus.pendingSupervisor) ...[
+          if (analisis.haySuficiente) ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 6),
+              child: Text(
+                "Catálogo OK",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.green.shade800,
+                ),
+              ),
+            ),
+            _TextActionButton(
+              label: "ENVIAR",
+              background: AppTokens.statusOk,
+              foreground: Colors.white,
+              onPressed: () => _decidirStock(context, o, hayStock: true),
+            ),
+          ] else ...[
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 4),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 160),
+                child: Text(
+                  analisis.match != null
+                      ? "Sin stock suficiente"
+                      : "Sin coincidencia · pañol",
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.orange.shade900,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            _TextActionButton(
+              label: "PEDIR A PAÑOL",
+              background: Colors.orange.shade800,
+              foreground: Colors.white,
+              onPressed: () => _decidirStock(context, o, hayStock: false),
+            ),
+          ],
+        ],
+        if (o.workflowStatus ==
+            MaintenanceWorkflowStatus.supervisorStockOk)
+          _TextActionButton(
+            label: "RETIRAR",
+            background: AppTokens.redAction,
+            foreground: Colors.white,
+            onPressed: () => _retirarDesdeStock(context, o),
+          ),
+      ],
     );
   }
 
-  void _pedirAPanol(BuildContext context, MaintenanceOrder o) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          "Pedido a pañol: ${o.producto} (${o.numeroOrden}) — próximamente.",
+  Future<void> _retirarDesdeStock(BuildContext context, MaintenanceOrder o) async {
+    try {
+      await ref.read(maintenanceOrdersProvider.notifier).registrarRetiro(o.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Retiro registrado. ${o.numeroOrden} pasó al historial.",
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("No se pudo registrar el retiro: $e")),
+      );
+    }
+  }
+
+  Future<void> _decidirStock(
+    BuildContext context,
+    MaintenanceOrder o, {
+    required bool hayStock,
+  }) async {
+    try {
+      await ref.read(maintenanceOrdersProvider.notifier).supervisorDecideStock(
+            orderId: o.id,
+            hayStock: hayStock,
+          );
+      if (!hayStock) {
+        ref.invalidate(panolForwardedOrdersProvider);
+      }
+      ref.invalidate(mantenimientoNotificacionesProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hayStock
+                ? "Enviado. Mantenimiento recibió aviso para retirar."
+                : "Enviado a pañol. Mantenimiento recibió aviso.",
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("No se pudo actualizar: $e")),
+      );
+    }
+  }
+
+  void _onBack(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go("/home");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final pedidos = ref.watch(maintenanceOrdersProvider);
+    final asyncPedidos = ref.watch(maintenanceOrdersProvider);
     final catalog = ref.watch(supervisorStockCatalogProvider);
-    final n = pedidos.length;
-
-    return Scaffold(
+    return asyncPedidos.when(
+      loading: () => Scaffold(
+        backgroundColor: AppTokens.surfacePage,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _PedidosMantenimientoBar(onBack: () => _onBack(context)),
+            const Expanded(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
+      ),
+      error: (e, _) => Scaffold(
+        backgroundColor: AppTokens.surfacePage,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _PedidosMantenimientoBar(onBack: () => _onBack(context)),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    "No se pudieron cargar los pedidos.\n$e",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey.shade800),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      data: (pedidos) {
+        final n = pedidos.length;
+        return Scaffold(
       backgroundColor: AppTokens.surfacePage,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _PedidosMantenimientoBar(
-            onBack: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go("/home");
-              }
-            },
+            onBack: () => _onBack(context),
           ),
           Expanded(
             child: Padding(
@@ -364,11 +609,11 @@ class _SupervisorMaintenanceOrdersScreenState
                                     for (var i = 0; i < pedidos.length; i++)
                                       () {
                                         final fila = pedidos[i];
-                                        final hayStock =
-                                            _hayStockDisponibleParaPedido(
-                                          fila,
-                                          catalog,
-                                        );
+                                        final analisis =
+                                            analizarStockPedido(fila, catalog);
+                                        final (ebg, efg) =
+                                            SupervisorMaintenanceOrdersScreen
+                                                ._workflowBadgeColors(fila);
                                         return TableRow(
                                           decoration: BoxDecoration(
                                             color: i.isEven
@@ -397,19 +642,11 @@ class _SupervisorMaintenanceOrdersScreenState
                                                 child: _EstadoChip(
                                                   label:
                                                       SupervisorMaintenanceOrdersScreen
-                                                          ._estadoLabel(
-                                                    fila.estado,
+                                                          ._workflowBadgeLabel(
+                                                    fila,
                                                   ),
-                                                  background:
-                                                      SupervisorMaintenanceOrdersScreen
-                                                          ._estadoColors(
-                                                    fila.estado,
-                                                  ).$1,
-                                                  foreground:
-                                                      SupervisorMaintenanceOrdersScreen
-                                                          ._estadoColors(
-                                                    fila.estado,
-                                                  ).$2,
+                                                  background: ebg,
+                                                  foreground: efg,
                                                 ),
                                               ),
                                             ),
@@ -434,27 +671,90 @@ class _SupervisorMaintenanceOrdersScreenState
                                                       fila,
                                                     ),
                                                   ),
-                                                  _TextActionButton(
-                                                    label: hayStock
-                                                        ? "RETIRAR"
-                                                        : "PEDIR",
-                                                    background:
-                                                        AppTokens.redAction,
-                                                    foreground: Colors.white,
-                                                    onPressed: () {
-                                                      if (hayStock) {
-                                                        _retirarDesdeStock(
+                                                  if (fila.workflowStatus ==
+                                                      MaintenanceWorkflowStatus
+                                                          .pendingSupervisor) ...[
+                                                    if (analisis.haySuficiente)
+                                                      _TextActionButton(
+                                                        label: "ENVIAR",
+                                                        background:
+                                                            AppTokens.statusOk,
+                                                        foreground: Colors.white,
+                                                        onPressed: () =>
+                                                            _decidirStock(
                                                           context,
                                                           fila,
-                                                        );
-                                                      } else {
-                                                        _pedirAPanol(
+                                                          hayStock: true,
+                                                        ),
+                                                      )
+                                                    else
+                                                      _TextActionButton(
+                                                        label: "PEDIR A PAÑOL",
+                                                        background: Colors
+                                                            .orange.shade800,
+                                                        foreground: Colors.white,
+                                                        onPressed: () =>
+                                                            _decidirStock(
                                                           context,
                                                           fila,
-                                                        );
-                                                      }
-                                                    },
-                                                  ),
+                                                          hayStock: false,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                  if (fila.workflowStatus ==
+                                                      MaintenanceWorkflowStatus
+                                                          .supervisorStockOk)
+                                                    _TextActionButton(
+                                                      label: "RETIRAR",
+                                                      background:
+                                                          AppTokens.redAction,
+                                                      foreground: Colors.white,
+                                                      onPressed: () =>
+                                                          _retirarDesdeStock(
+                                                        context,
+                                                        fila,
+                                                      ),
+                                                    ),
+                                                  if (fila.workflowStatus ==
+                                                          MaintenanceWorkflowStatus
+                                                              .pendingSupervisor &&
+                                                      analisis.haySuficiente)
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                        left: 4,
+                                                        top: 4,
+                                                      ),
+                                                      child: Text(
+                                                        "Automático según catálogo",
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors
+                                                              .green.shade800,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  if (fila.workflowStatus ==
+                                                          MaintenanceWorkflowStatus
+                                                              .pendingSupervisor &&
+                                                      !analisis.haySuficiente)
+                                                    Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                        left: 4,
+                                                        top: 4,
+                                                      ),
+                                                      child: Text(
+                                                        analisis.match != null
+                                                            ? "Sin stock suficiente"
+                                                            : "Sin coincidencia en catálogo",
+                                                        style: TextStyle(
+                                                          fontSize: 10,
+                                                          color: Colors
+                                                              .orange.shade900,
+                                                        ),
+                                                      ),
+                                                    ),
                                                 ],
                                               ),
                                             ),
@@ -473,8 +773,6 @@ class _SupervisorMaintenanceOrdersScreenState
                                 const SizedBox(height: 10),
                             itemBuilder: (context, index) {
                               final o = pedidos[index];
-                              final hayStock =
-                                  _hayStockDisponibleParaPedido(o, catalog);
                               return _MobileMaintenanceOrderCard(
                                 index: index,
                                 order: o,
@@ -482,27 +780,18 @@ class _SupervisorMaintenanceOrdersScreenState
                                     SupervisorMaintenanceOrdersScreen._fechaFmt
                                         .format(o.fechaPedido),
                                 estadoLabel:
-                                    SupervisorMaintenanceOrdersScreen._estadoLabel(
-                                  o.estado,
-                                ),
+                                    SupervisorMaintenanceOrdersScreen
+                                        ._workflowBadgeLabel(o),
                                 estadoBg:
                                     SupervisorMaintenanceOrdersScreen
-                                        ._estadoColors(o.estado)
+                                        ._workflowBadgeColors(o)
                                         .$1,
                                 estadoFg:
                                     SupervisorMaintenanceOrdersScreen
-                                        ._estadoColors(o.estado)
+                                        ._workflowBadgeColors(o)
                                         .$2,
                                 onVer: () => _mostrarDetalle(context, o),
-                                secondaryLabel:
-                                    hayStock ? "RETIRAR" : "PEDIR",
-                                onSecondary: () {
-                                  if (hayStock) {
-                                    _retirarDesdeStock(context, o);
-                                  } else {
-                                    _pedirAPanol(context, o);
-                                  }
-                                },
+                                footerActions: _mobileFooterActions(context, o, catalog),
                               );
                             },
                           );
@@ -528,6 +817,8 @@ class _SupervisorMaintenanceOrdersScreenState
           ),
         ],
       ),
+    );
+      },
     );
   }
 }
@@ -582,8 +873,7 @@ class _MobileMaintenanceOrderCard extends StatelessWidget {
     required this.estadoBg,
     required this.estadoFg,
     required this.onVer,
-    required this.secondaryLabel,
-    required this.onSecondary,
+    required this.footerActions,
   });
 
   final int index;
@@ -593,8 +883,7 @@ class _MobileMaintenanceOrderCard extends StatelessWidget {
   final Color estadoBg;
   final Color estadoFg;
   final VoidCallback onVer;
-  final String secondaryLabel;
-  final VoidCallback onSecondary;
+  final Widget footerActions;
 
   @override
   Widget build(BuildContext context) {
@@ -652,27 +941,7 @@ class _MobileMaintenanceOrderCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _TextActionButton(
-                      label: "VER",
-                      background: AppTokens.yellowHeader,
-                      foreground: Colors.black87,
-                      onPressed: onVer,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _TextActionButton(
-                      label: secondaryLabel,
-                      background: AppTokens.redAction,
-                      foreground: Colors.white,
-                      onPressed: onSecondary,
-                    ),
-                  ),
-                ],
-              ),
+              footerActions,
             ],
           ),
         ),

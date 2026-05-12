@@ -5,10 +5,11 @@ import "package:intl/intl.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
-import "../application/maintenance_history_provider.dart";
+import "../application/supervisor_maintenance_history_provider.dart";
 import "../domain/completed_maintenance_record.dart";
+import "../domain/maintenance_order.dart";
 
-/// Historial de pedidos de mantenimiento cerrados (p. ej. por retiro), con filtros.
+/// Historial de pedidos de mantenimiento (Supabase): entregados en verde, consulta pañol en naranja.
 class SupervisorMaintenanceHistoryScreen extends ConsumerStatefulWidget {
 	const SupervisorMaintenanceHistoryScreen({super.key});
 
@@ -104,10 +105,14 @@ class _SupervisorMaintenanceHistoryScreenState
 		if (d != null && mounted) setState(() => _hasta = d);
 	}
 
+	Future<void> _refrescarHistorial() async {
+		ref.invalidate(supervisorMaintenanceHistoryProvider);
+		await ref.read(supervisorMaintenanceHistoryProvider.future);
+	}
+
 	@override
 	Widget build(BuildContext context) {
-		final registros = ref.watch(maintenanceHistoryProvider);
-		final filtrados = _filtrar(registros);
+		final asyncHistorial = ref.watch(supervisorMaintenanceHistoryProvider);
 
 		return Scaffold(
 			backgroundColor: AppTokens.surfacePage,
@@ -129,243 +134,357 @@ class _SupervisorMaintenanceHistoryScreenState
 							alignment: Alignment.topCenter,
 							child: ConstrainedBox(
 								constraints: const BoxConstraints(maxWidth: 960),
-								child: Padding(
-									padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-									child: Column(
-										crossAxisAlignment: CrossAxisAlignment.stretch,
-										children: [
-											Text(
-												"Filtrar",
-												style: TextStyle(
-													fontWeight: FontWeight.bold,
-													fontSize: 14,
-													color: Colors.grey.shade800,
-												),
-											),
-											const SizedBox(height: 10),
-											TextField(
-												controller: _numeroCtrl,
-												onChanged: (_) => setState(() {}),
-												decoration: InputDecoration(
-													isDense: true,
-													labelText: "N° de orden",
-													hintText: "Ej. ORD-0001",
-													filled: true,
-													fillColor: AppTokens.whiteSurface,
-													border: OutlineInputBorder(
-														borderRadius: BorderRadius.circular(
-															AppTokens.radiusMd,
-														),
-														borderSide: const BorderSide(
-															color: AppTokens.greyBorder,
-														),
-													),
-													enabledBorder: OutlineInputBorder(
-														borderRadius: BorderRadius.circular(
-															AppTokens.radiusMd,
-														),
-														borderSide: const BorderSide(
-															color: AppTokens.greyBorder,
-														),
-													),
-												),
-											),
-											const SizedBox(height: 10),
-											TextField(
-												controller: _nombreCtrl,
-												onChanged: (_) => setState(() {}),
-												decoration: InputDecoration(
-													isDense: true,
-													labelText: "Nombre / producto",
-													hintText: "Solicitante o producto…",
-													filled: true,
-													fillColor: AppTokens.whiteSurface,
-													border: OutlineInputBorder(
-														borderRadius: BorderRadius.circular(
-															AppTokens.radiusMd,
-														),
-														borderSide: const BorderSide(
-															color: AppTokens.greyBorder,
-														),
-													),
-													enabledBorder: OutlineInputBorder(
-														borderRadius: BorderRadius.circular(
-															AppTokens.radiusMd,
-														),
-														borderSide: const BorderSide(
-															color: AppTokens.greyBorder,
-														),
-													),
-												),
-											),
-											const SizedBox(height: 12),
-											Wrap(
-												spacing: 10,
-												runSpacing: 10,
-												crossAxisAlignment: WrapCrossAlignment.center,
+								child: asyncHistorial.when(
+									data: (registros) {
+										final filtrados = _filtrar(registros);
+										return Padding(
+											padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+											child: Column(
+												crossAxisAlignment: CrossAxisAlignment.stretch,
 												children: [
-													OutlinedButton.icon(
-														onPressed: _elegirDesde,
-														icon: const Icon(Icons.calendar_today_outlined, size: 18),
-														label: Text(
-															_desde == null
-																	? "Fecha desde"
-																	: "Desde: ${SupervisorMaintenanceHistoryScreen._soloFecha.format(_desde!)}",
+													Text(
+														"Filtrar",
+														style: TextStyle(
+															fontWeight: FontWeight.bold,
+															fontSize: 14,
+															color: Colors.grey.shade800,
 														),
 													),
-													OutlinedButton.icon(
-														onPressed: _elegirHasta,
-														icon: const Icon(Icons.event_outlined, size: 18),
-														label: Text(
-															_hasta == null
-																	? "Fecha hasta"
-																	: "Hasta: ${SupervisorMaintenanceHistoryScreen._soloFecha.format(_hasta!)}",
+													const SizedBox(height: 10),
+													TextField(
+														controller: _numeroCtrl,
+														onChanged: (_) => setState(() {}),
+														decoration: InputDecoration(
+															isDense: true,
+															labelText: "N° de orden",
+															hintText: "Ej. ORD-0001",
+															filled: true,
+															fillColor: AppTokens.whiteSurface,
+															border: OutlineInputBorder(
+																borderRadius: BorderRadius.circular(
+																	AppTokens.radiusMd,
+																),
+																borderSide: const BorderSide(
+																	color: AppTokens.greyBorder,
+																),
+															),
+															enabledBorder: OutlineInputBorder(
+																borderRadius: BorderRadius.circular(
+																	AppTokens.radiusMd,
+																),
+																borderSide: const BorderSide(
+																	color: AppTokens.greyBorder,
+																),
+															),
 														),
 													),
-													TextButton(
-														onPressed: _limpiarFiltros,
-														child: const Text("Limpiar filtros"),
+													const SizedBox(height: 10),
+													TextField(
+														controller: _nombreCtrl,
+														onChanged: (_) => setState(() {}),
+														decoration: InputDecoration(
+															isDense: true,
+															labelText: "Nombre / producto",
+															hintText: "Solicitante o producto…",
+															filled: true,
+															fillColor: AppTokens.whiteSurface,
+															border: OutlineInputBorder(
+																borderRadius: BorderRadius.circular(
+																	AppTokens.radiusMd,
+																),
+																borderSide: const BorderSide(
+																	color: AppTokens.greyBorder,
+																),
+															),
+															enabledBorder: OutlineInputBorder(
+																borderRadius: BorderRadius.circular(
+																	AppTokens.radiusMd,
+																),
+																borderSide: const BorderSide(
+																	color: AppTokens.greyBorder,
+																),
+															),
+														),
+													),
+													const SizedBox(height: 12),
+													Wrap(
+														spacing: 10,
+														runSpacing: 10,
+														crossAxisAlignment: WrapCrossAlignment.center,
+														children: [
+															OutlinedButton.icon(
+																onPressed: _elegirDesde,
+																icon: const Icon(Icons.calendar_today_outlined, size: 18),
+																label: Text(
+																	_desde == null
+																			? "Fecha desde"
+																			: "Desde: ${SupervisorMaintenanceHistoryScreen._soloFecha.format(_desde!)}",
+																),
+															),
+															OutlinedButton.icon(
+																onPressed: _elegirHasta,
+																icon: const Icon(Icons.event_outlined, size: 18),
+																label: Text(
+																	_hasta == null
+																			? "Fecha hasta"
+																			: "Hasta: ${SupervisorMaintenanceHistoryScreen._soloFecha.format(_hasta!)}",
+																),
+															),
+															TextButton(
+																onPressed: _limpiarFiltros,
+																child: const Text("Limpiar filtros"),
+															),
+														],
+													),
+													const SizedBox(height: 14),
+													Text(
+														registros.isEmpty
+																? "Sin registros en historial."
+																: "Mostrando ${filtrados.length} de ${registros.length}",
+														style: TextStyle(
+															fontSize: 13,
+															color: Colors.grey.shade700,
+														),
+													),
+													const SizedBox(height: 10),
+													Expanded(
+														child: RefreshIndicator(
+															onRefresh: _refrescarHistorial,
+															child: filtrados.isEmpty
+																	? ListView(
+																			physics: const AlwaysScrollableScrollPhysics(),
+																			children: [
+																				SizedBox(
+																					height: MediaQuery.sizeOf(context).height * 0.25,
+																					child: Center(
+																						child: Text(
+																							registros.isEmpty
+																									? "Aún no hay pedidos entregados ni enviados a pañol.\nCuando un pedido se complete o pase a consulta con pañol,\naparecerá aquí."
+																									: "No hay resultados con estos filtros.",
+																							textAlign: TextAlign.center,
+																							style: TextStyle(
+																								fontSize: 15,
+																								color: Colors.grey.shade600,
+																								height: 1.35,
+																							),
+																						),
+																					),
+																				),
+																			],
+																		)
+																	: ListView.separated(
+																			physics: const AlwaysScrollableScrollPhysics(),
+																			itemCount: filtrados.length,
+																			separatorBuilder: (_, __) =>
+																					const SizedBox(height: 10),
+																			itemBuilder: (context, index) {
+																				return _HistorialPedidoCard(
+																					record: filtrados[index],
+																				);
+																			},
+																		),
+														),
 													),
 												],
 											),
-											const SizedBox(height: 14),
-											Text(
-												filtrados.isEmpty && registros.isEmpty
-														? "Sin registros en historial."
-														: "Mostrando ${filtrados.length} de ${registros.length}",
-												style: TextStyle(
-													fontSize: 13,
-													color: Colors.grey.shade700,
-												),
+										);
+									},
+									loading: () => const Center(child: CircularProgressIndicator()),
+									error: (e, _) => Center(
+										child: Padding(
+											padding: AppTokens.padScreen,
+											child: Column(
+												mainAxisAlignment: MainAxisAlignment.center,
+												children: [
+													Icon(Icons.error_outline, size: 48, color: Colors.red.shade700),
+													const SizedBox(height: 12),
+													Text(
+														"No se pudo cargar el historial",
+														style: Theme.of(context).textTheme.titleMedium,
+														textAlign: TextAlign.center,
+													),
+													const SizedBox(height: 8),
+													Text(
+														"$e",
+														textAlign: TextAlign.center,
+														style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+													),
+													const SizedBox(height: 16),
+													FilledButton(
+														onPressed: _refrescarHistorial,
+														child: const Text("Reintentar"),
+													),
+												],
 											),
-											const SizedBox(height: 10),
-											Expanded(
-												child: filtrados.isEmpty
-														? Center(
-																child: Text(
-																	registros.isEmpty
-																			? "Cuando completes un pedido por retiro de stock,\naparecerá aquí."
-																			: "No hay resultados con estos filtros.",
-																	textAlign: TextAlign.center,
-																	style: TextStyle(
-																		fontSize: 15,
-																		color: Colors.grey.shade600,
-																		height: 1.35,
-																	),
-																),
-															)
-														: ListView.separated(
-																itemCount: filtrados.length,
-																separatorBuilder: (_, __) =>
-																		const SizedBox(height: 10),
-																itemBuilder: (context, index) {
-																	final r = filtrados[index];
-																	final o = r.pedido;
-																	return Material(
-																		color: AppTokens.whiteSurface,
-																		borderRadius: BorderRadius.circular(
-																			AppTokens.radiusMd,
-																		),
-																		elevation: 0,
-																		child: Container(
-																				padding: const EdgeInsets.all(14),
-																				decoration: BoxDecoration(
-																					borderRadius: BorderRadius.circular(
-																						AppTokens.radiusMd,
-																					),
-																					border: Border.all(
-																						color: AppTokens.greyBorder,
-																					),
-																				),
-																				child: Column(
-																					crossAxisAlignment:
-																							CrossAxisAlignment.start,
-																					children: [
-																						Row(
-																							crossAxisAlignment:
-																									CrossAxisAlignment.start,
-																							children: [
-																								Expanded(
-																									child: Text(
-																										o.numeroOrden,
-																										style: const TextStyle(
-																											fontWeight:
-																													FontWeight.bold,
-																											fontSize: 16,
-																											color: Colors.black87,
-																										),
-																									),
-																								),
-																								Container(
-																									padding:
-																											const EdgeInsets.symmetric(
-																										horizontal: 8,
-																										vertical: 4,
-																									),
-																									decoration: BoxDecoration(
-																										color: AppTokens.surfaceMuted,
-																										borderRadius:
-																												BorderRadius.circular(6),
-																									),
-																									child: Text(
-																										r.motivoCierre,
-																										style: TextStyle(
-																											fontSize: 11,
-																											fontWeight:
-																													FontWeight.w600,
-																											color: Colors.grey.shade800,
-																										),
-																									),
-																								),
-																							],
-																						),
-																						const SizedBox(height: 8),
-																						Text(
-																							"Cierre: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(r.fechaCierre)}",
-																							style: TextStyle(
-																								fontSize: 13,
-																								color: Colors.grey.shade700,
-																							),
-																						),
-																						const SizedBox(height: 4),
-																						Text(
-																							"Pedido: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(o.fechaPedido)}",
-																							style: TextStyle(
-																								fontSize: 12,
-																								color: Colors.grey.shade600,
-																							),
-																						),
-																						const SizedBox(height: 10),
-																						Text(
-																							o.solicitante,
-																							style: const TextStyle(
-																								fontSize: 14,
-																								fontWeight: FontWeight.w600,
-																								color: Colors.black87,
-																							),
-																						),
-																						const SizedBox(height: 4),
-																						Text(
-																							o.producto,
-																							style: const TextStyle(
-																								fontSize: 13,
-																								color: Colors.black87,
-																							),
-																						),
-																					],
-																				),
-																			),
-																	);
-																},
-															),
-											),
-										],
+										),
 									),
 								),
 							),
 						),
 					),
 				],
+			),
+		);
+	}
+}
+
+class _HistorialPedidoCard extends StatelessWidget {
+	const _HistorialPedidoCard({required this.record});
+
+	final CompletedMaintenanceRecord record;
+
+	static const Color _verdeFondo = Color(0xFFE8F5E9);
+	static const Color _verdeBorde = Color(0xFF2E7D32);
+	static const Color _verdeTexto = Color(0xFF1B5E20);
+
+	@override
+	Widget build(BuildContext context) {
+		final o = record.pedido;
+		final ws = o.workflowStatus;
+
+		final bool esEntregado = ws == MaintenanceWorkflowStatus.completed;
+		final bool esConsultaPanol = ws == MaintenanceWorkflowStatus.forwardedToPanol;
+
+		final Color fondo;
+		final Color borde;
+		final Color tituloColor;
+		final Color secundario;
+
+		if (esEntregado) {
+			fondo = _verdeFondo;
+			borde = _verdeBorde;
+			tituloColor = _verdeTexto;
+			secundario = _verdeTexto.withValues(alpha: 0.85);
+		} else if (esConsultaPanol) {
+			fondo = Colors.orange.shade50;
+			borde = Colors.orange.shade800;
+			tituloColor = Colors.orange.shade900;
+			secundario = Colors.orange.shade900.withValues(alpha: 0.88);
+		} else {
+			fondo = Colors.grey.shade100;
+			borde = Colors.grey.shade600;
+			tituloColor = Colors.black87;
+			secundario = Colors.grey.shade800;
+		}
+
+		final fechaLinea = esEntregado
+				? "Entregado: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre)}"
+				: esConsultaPanol
+						? "En consulta con pañol: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre)}"
+						: "Última actualización: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre)}";
+
+		return Material(
+			color: fondo,
+			borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+			elevation: 0,
+			child: InkWell(
+				borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+				onTap: esConsultaPanol
+						? () => context.push("/panol/pedidos")
+						: null,
+				child: Container(
+					padding: const EdgeInsets.all(14),
+					decoration: BoxDecoration(
+						borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+						border: Border.all(color: borde, width: 1.4),
+					),
+					child: Column(
+						crossAxisAlignment: CrossAxisAlignment.start,
+						children: [
+							Row(
+								crossAxisAlignment: CrossAxisAlignment.start,
+								children: [
+									Expanded(
+										child: Text(
+											o.numeroOrden,
+											style: TextStyle(
+												fontWeight: FontWeight.bold,
+												fontSize: 16,
+												color: tituloColor,
+											),
+										),
+									),
+									Container(
+										padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+										decoration: BoxDecoration(
+											color: esEntregado
+													? _verdeBorde
+													: esConsultaPanol
+															? Colors.orange.shade800
+															: Colors.grey.shade700,
+											borderRadius: BorderRadius.circular(6),
+										),
+										child: Text(
+											record.motivoCierre.toUpperCase(),
+											style: const TextStyle(
+												fontSize: 10.5,
+												fontWeight: FontWeight.w800,
+												letterSpacing: 0.3,
+												color: Colors.white,
+											),
+										),
+									),
+									if (esConsultaPanol) ...[
+										const SizedBox(width: 8),
+										OutlinedButton.icon(
+											onPressed: () => context.push("/panol/pedidos"),
+											style: OutlinedButton.styleFrom(
+												foregroundColor: Colors.orange.shade900,
+												side: BorderSide(color: Colors.orange.shade800, width: 1.4),
+												padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+												minimumSize: Size.zero,
+												tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+											),
+											icon: Icon(Icons.track_changes_outlined, size: 18, color: Colors.orange.shade900),
+											label: Text(
+												"SEGUIMIENTO",
+												style: TextStyle(
+													fontWeight: FontWeight.w800,
+													fontSize: 11,
+													color: Colors.orange.shade900,
+												),
+											),
+										),
+									],
+								],
+							),
+							const SizedBox(height: 8),
+							Text(
+								fechaLinea,
+								style: TextStyle(
+									fontSize: 13,
+									color: secundario,
+									fontWeight: FontWeight.w600,
+								),
+							),
+							const SizedBox(height: 4),
+							Text(
+								"Pedido: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(o.fechaPedido)}",
+								style: TextStyle(
+									fontSize: 12,
+									color: secundario.withValues(alpha: 0.9),
+								),
+							),
+							const SizedBox(height: 10),
+							Text(
+								o.solicitante,
+								style: TextStyle(
+									fontSize: 14,
+									fontWeight: FontWeight.w600,
+									color: tituloColor,
+								),
+							),
+							const SizedBox(height: 4),
+							Text(
+								o.producto,
+								style: TextStyle(
+									fontSize: 13,
+									color: tituloColor,
+								),
+							),
+						],
+					),
+				),
 			),
 		);
 	}

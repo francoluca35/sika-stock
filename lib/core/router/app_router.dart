@@ -11,9 +11,10 @@ import "../../features/admin/presentation/users_list_screen.dart";
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/presentation/login_screen.dart";
 import "../../features/home/presentation/home_screen.dart";
+import "../../features/orders/presentation/my_maintenance_orders_screen.dart";
 import "../../features/orders/presentation/place_order_screen.dart";
 import "../../features/panol/presentation/panol_pedidos_screen.dart";
-import "../../features/panol/presentation/panol_seguimiento_screen.dart";
+import "../../features/panol/presentation/widgets/seguimiento_access_gate.dart";
 import "../../features/panol/presentation/panol_stock_hub_screen.dart";
 import "../../features/panol/presentation/panol_stock_screen.dart";
 import "../../features/stock/presentation/add_stock_screen.dart";
@@ -89,6 +90,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				),
 			),
 			GoRoute(
+				path: "/pedidos/mis-pedidos",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const MyMaintenanceOrdersScreen(),
+				),
+			),
+			GoRoute(
 				path: "/stock",
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
@@ -120,7 +128,7 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				path: "/panol/seguimiento",
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
-					child: const PanolSeguimientoScreen(),
+					child: const SeguimientoAccessGate(),
 				),
 			),
 			GoRoute(
