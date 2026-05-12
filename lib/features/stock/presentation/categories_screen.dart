@@ -8,8 +8,15 @@ import "../application/stock_categories_provider.dart";
 import "widgets/stock_screen_header.dart";
 
 /// Alta y listado de categorías (editar / eliminar).
+///
+/// [fallbackLocation] cuando no hay historial para `pop` (p. ej. `/home` en Pañol).
 class CategoriesScreen extends ConsumerStatefulWidget {
-	const CategoriesScreen({super.key});
+	const CategoriesScreen({
+		super.key,
+		this.fallbackLocation = "/stock",
+	});
+
+	final String fallbackLocation;
 
 	@override
 	ConsumerState<CategoriesScreen> createState() => _CategoriesScreenState();
@@ -137,7 +144,7 @@ class _CategoriesScreenState extends ConsumerState<CategoriesScreen> {
 							if (context.canPop()) {
 								context.pop();
 							} else {
-								context.go("/stock");
+								context.go(widget.fallbackLocation);
 							}
 						},
 					),

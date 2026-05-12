@@ -10,6 +10,10 @@ import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/presentation/login_screen.dart";
 import "../../features/home/presentation/home_screen.dart";
 import "../../features/orders/presentation/place_order_screen.dart";
+import "../../features/panol/presentation/panol_pedidos_screen.dart";
+import "../../features/panol/presentation/panol_seguimiento_screen.dart";
+import "../../features/panol/presentation/panol_stock_hub_screen.dart";
+import "../../features/panol/presentation/panol_stock_screen.dart";
 import "../../features/stock/presentation/add_stock_screen.dart";
 import "../../features/stock/presentation/categories_screen.dart";
 import "../../features/stock/presentation/stock_home_screen.dart";
@@ -73,6 +77,41 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const StockHomeScreen(),
+				),
+			),
+			GoRoute(
+				path: "/panol/stock",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const PanolStockScreen(),
+				),
+			),
+			GoRoute(
+				path: "/panol/stock-opciones",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const PanolStockHubScreen(),
+				),
+			),
+			GoRoute(
+				path: "/panol/pedidos",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const PanolPedidosScreen(),
+				),
+			),
+			GoRoute(
+				path: "/panol/seguimiento",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const PanolSeguimientoScreen(),
+				),
+			),
+			GoRoute(
+				path: "/panol/categorias",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const CategoriesScreen(fallbackLocation: "/home"),
 				),
 			),
 			GoRoute(
