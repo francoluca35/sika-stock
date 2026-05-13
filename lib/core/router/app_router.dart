@@ -14,6 +14,7 @@ import "../../features/home/presentation/home_screen.dart";
 import "../../features/orders/presentation/my_maintenance_orders_screen.dart";
 import "../../features/orders/presentation/place_order_screen.dart";
 import "../../features/panol/presentation/panol_pedidos_screen.dart";
+import "../../features/panol/presentation/panol_pedidos_historial_screen.dart";
 import "../../features/panol/presentation/widgets/seguimiento_access_gate.dart";
 import "../../features/panol/presentation/panol_stock_hub_screen.dart";
 import "../../features/panol/presentation/panol_stock_screen.dart";
@@ -123,6 +124,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const PanolPedidosScreen(),
+				),
+			),
+			GoRoute(
+				path: "/panol/pedidos-historial",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const PanolPedidosHistorialScreen(),
 				),
 			),
 			GoRoute(

@@ -4,6 +4,7 @@ import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
+import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
 import "../../supervisor/application/maintenance_orders_realtime_provider.dart";
 
 /// Pantalla inicial **Pañol**: solo accesos; cada uno abre su propia pantalla.
@@ -33,6 +34,8 @@ class PanolHomeScreen extends ConsumerWidget {
 									child: Column(
 										crossAxisAlignment: CrossAxisAlignment.stretch,
 										children: [
+											const MaintenanceNotificationsBlock(),
+											const SizedBox(height: 12),
 											Text(
 												"Seleccioná una opción",
 												style: TextStyle(

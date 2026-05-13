@@ -627,7 +627,9 @@ class _SupervisorMaintenanceOrdersScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            "Retiro registrado. ${o.numeroOrden} pasó al historial.",
+            o.stockItemId != null && o.stockItemId!.isNotEmpty
+                ? "Retiro registrado. ${o.numeroOrden}: se descontaron ${o.quantity} u. del inventario."
+                : "Retiro registrado. ${o.numeroOrden} pasó al historial.",
           ),
         ),
       );
@@ -672,7 +674,7 @@ class _SupervisorMaintenanceOrdersScreenState
         SnackBar(
           content: Text(
             hayStock
-                ? "Stock confirmado: se descontaron ${o.quantity} u. del inventario."
+                ? "Stock confirmado: listo para retiro (se descontará al registrar la entrega)."
                 : "Derivado a pañol (sin stock según catálogo).",
           ),
         ),

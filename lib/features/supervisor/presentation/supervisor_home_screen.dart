@@ -6,6 +6,7 @@ import "../../../core/theme/app_tokens.dart";
 import "../../admin/presentation/widgets/admin_shell_bottom_bar.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
+import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
 import "../application/maintenance_orders_provider.dart";
 import "../application/maintenance_orders_realtime_provider.dart";
 
@@ -71,6 +72,8 @@ class SupervisorHomeScreen extends ConsumerWidget {
 											child: Column(
 												crossAxisAlignment: CrossAxisAlignment.stretch,
 												children: [
+													const MaintenanceNotificationsBlock(),
+													const SizedBox(height: 12),
 													Text(
 														"Bienvenido, $nombre",
 														style: const TextStyle(

@@ -13,7 +13,7 @@ class ComprasStockRepository {
 	Future<List<ComprasPanolStockRequestRow>> fetchPanolStockRequests() async {
 		final raw = await _client
 				.from("compras_panol_stock_requests")
-				.select("*, maintenance_orders(workflow_status)")
+				.select("*, maintenance_orders(workflow_status, created_at, updated_at)")
 				.order("created_at", ascending: false);
 		final list = raw as List? ?? [];
 		return list
@@ -42,6 +42,22 @@ class ComprasStockRepository {
 		await _client.from("compras_in_app_notifications").update({
 			"read_at": DateTime.now().toUtc().toIso8601String(),
 		}).eq("id", notificationId).eq("user_id", uid);
+	}
+
+	Future<void> dismissNotification(String notificationId) async {
+		final uid = _client.auth.currentUser?.id;
+		if (uid == null) return;
+		await _client
+				.from("compras_in_app_notifications")
+				.delete()
+				.eq("id", notificationId)
+				.eq("user_id", uid);
+	}
+
+	Future<void> dismissAllMyNotifications() async {
+		final uid = _client.auth.currentUser?.id;
+		if (uid == null) return;
+		await _client.from("compras_in_app_notifications").delete().eq("user_id", uid);
 	}
 
 	/// Marca como leídas todas las notificaciones de solicitudes Pañol (p. ej. al abrir historial).
@@ -85,7 +101,7 @@ class ComprasStockRepository {
 				.eq("workflow_status", "panol_requested_compras");
 	}
 
-	/// Compras: confirma llegada del material a planta (notifica a los mismos actores).
+	/// Compras o Pañol: confirma llegada del material a planta (notifica a todos los roles).
 	Future<void> comprasNotifyMaterialArrived(String maintenanceOrderId) async {
 		await _client
 				.from("maintenance_orders")

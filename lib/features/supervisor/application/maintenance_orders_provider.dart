@@ -65,7 +65,7 @@ class MaintenanceOrdersNotifier extends AsyncNotifier<List<MaintenanceOrder>> {
 					kind: hayStock ? "stock_ok_retiro" : "derivado_panol",
 					title: hayStock ? "Podés retirar el pedido" : "Pedido en gestión con pañol",
 					body: hayStock
-							? "${orden!.numeroOrden}: stock confirmado; se descontaron ${orden.quantity} u. del inventario. Pasá a retirar cuando puedas."
+							? "${orden!.numeroOrden}: stock disponible en inventario. Pasá a retirar cuando puedas."
 							: "${orden!.numeroOrden}: no hay stock suficiente en depósito automático. Pañol lo gestionará; estará disponible a la brevedad.",
 				);
 			} catch (_) {
@@ -121,6 +121,7 @@ class MaintenanceOrdersNotifier extends AsyncNotifier<List<MaintenanceOrder>> {
 		}
 		if (orden == null) return;
 		await ref.read(maintenanceOrdersRepositoryProvider).markCompleted(orderId);
+		ref.invalidate(supervisorStockCatalogProvider);
 		ref.invalidate(supervisorMaintenanceHistoryProvider);
 		await refresh();
 	}

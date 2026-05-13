@@ -11,6 +11,7 @@ import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../application/maintenance_orders_provider.dart";
+import "widgets/supervisor_pedir_producto_dialog.dart";
 
 /// Supervisor: elige una línea del **catálogo** de stock, confirma cantidad y destino,
 /// y registra retiro con stock o deriva a pañol si no alcanza el inventario.
@@ -142,7 +143,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 				SnackBar(
 					content: Text(
 						hayStock
-								? "Registrado: stock confirmado y descontado del inventario."
+								? "Registrado: stock confirmado; listo para retiro."
 								: "Registrado: derivado a pañol (sin stock suficiente en inventario).",
 					),
 				),
@@ -152,6 +153,71 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 			if (!mounted) return;
 			ScaffoldMessenger.of(context).showSnackBar(
 				SnackBar(content: Text("No se pudo registrar: $e")),
+			);
+		} finally {
+			if (mounted) setState(() => _enviando = false);
+		}
+	}
+
+	bool _busquedaSinResultados(List<StockProduct> filtrados) {
+		return _buscarCtrl.text.trim().isNotEmpty && filtrados.isEmpty;
+	}
+
+	Future<void> _pedirProductoAPanol() async {
+		final busqueda = _buscarCtrl.text.trim();
+		if (busqueda.isEmpty) return;
+
+		final datos = await showSupervisorPedirProductoDialog(
+			context: context,
+			nombreInicial: busqueda,
+			cantidadInicial: _cantidadPedida(),
+			destinoInicial: _destinoCtrl.text.trim().isEmpty ? null : _destinoCtrl.text.trim(),
+		);
+		if (datos == null || !mounted) return;
+
+		final perfil = await ref.read(currentProfileProvider.future);
+		if (perfil?.rol != AppRole.supervisor) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(content: Text("Solo el rol Supervisor puede usar este flujo.")),
+			);
+			return;
+		}
+
+		final nombre = perfil!.nombre?.trim();
+		final usuario = perfil.usuario?.trim();
+		final display = (nombre != null && nombre.isNotEmpty)
+				? nombre
+				: (usuario != null && usuario.isNotEmpty)
+						? usuario
+						: "Supervisor";
+		final solicitanteDisplay = "$display · SUPERVISOR (pedido a pañol)";
+
+		setState(() => _enviando = true);
+		try {
+			await ref.read(maintenanceOrdersProvider.notifier).supervisorCreateFromCatalogAndDecide(
+						solicitanteDisplay: solicitanteDisplay,
+						productName: datos.productName,
+						quantity: datos.quantity,
+						productType: datos.productType,
+						priority: datos.priority,
+						destination: datos.destination,
+						hayStock: false,
+					);
+			ref.invalidate(panolForwardedOrdersProvider);
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(
+					content: Text(
+						"Pedido enviado a pañol: ${datos.productName} · ${datos.quantity} u.",
+					),
+				),
+			);
+			_onBack(context);
+		} catch (e) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudo enviar el pedido: $e")),
 			);
 		} finally {
 			if (mounted) setState(() => _enviando = false);
@@ -210,6 +276,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 				final cant = _cantidadPedida() ?? 0;
 				final sel = _seleccion;
 				final haySuf = sel != null && cant > 0 && _hayStockSuficiente(sel, cant);
+				final sinResultados = _busquedaSinResultados(filtrados);
 
 				return Scaffold(
 					backgroundColor: AppTokens.surfacePage,
@@ -286,7 +353,38 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 													),
 												);
 											}),
-											if (filtrados.isEmpty)
+											if (sinResultados)
+												Padding(
+													padding: const EdgeInsets.symmetric(vertical: 16),
+													child: Column(
+														crossAxisAlignment: CrossAxisAlignment.stretch,
+														children: [
+															Text(
+																"No figura en el catálogo: «${_buscarCtrl.text.trim()}».",
+																textAlign: TextAlign.center,
+																style: TextStyle(
+																	color: Colors.grey.shade800,
+																	fontWeight: FontWeight.w600,
+																),
+															),
+															const SizedBox(height: 12),
+															FilledButton.icon(
+																style: FilledButton.styleFrom(
+																	backgroundColor: AppTokens.redAction,
+																	foregroundColor: Colors.white,
+																	padding: const EdgeInsets.symmetric(vertical: 14),
+																),
+																onPressed: _enviando ? null : _pedirProductoAPanol,
+																icon: const Icon(Icons.add_shopping_cart_outlined),
+																label: const Text(
+																	"PEDIR PRODUCTO",
+																	style: TextStyle(fontWeight: FontWeight.w800),
+																),
+															),
+														],
+													),
+												)
+											else if (filtrados.isEmpty)
 												Padding(
 													padding: const EdgeInsets.symmetric(vertical: 24),
 													child: Text(
@@ -355,7 +453,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 											const SizedBox(height: 20),
 											if (_enviando)
 												const Center(child: Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()))
-											else ...[
+											else if (!sinResultados) ...[
 												FilledButton(
 													style: FilledButton.styleFrom(
 														backgroundColor: AppTokens.statusOk,

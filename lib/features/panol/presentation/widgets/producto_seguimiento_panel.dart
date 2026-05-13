@@ -1,10 +1,14 @@
 import "dart:math" as math;
 
 import "package:flutter/material.dart";
+import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:intl/intl.dart";
 
 import "../../../../core/theme/app_tokens.dart";
+import "../../../compras/application/compras_stock_repository_provider.dart";
 import "../../../compras/presentation/widgets/compras_screen_metrics.dart";
+import "../../../orders/application/mantenimiento_notificaciones_provider.dart";
+import "../../application/panol_seguimiento_compras_provider.dart";
 
 /// Estado agregado del producto en el flujo compra → entrega.
 enum SeguimientoCompraEstado {
@@ -36,16 +40,25 @@ class ProductoSeguimiento {
 		required this.producto,
 		required this.estado,
 		required this.trayecto,
+		this.maintenanceOrderId,
+		this.workflowStatus,
 		this.referenciaPedido,
 	});
 
 	final String id;
 	final String producto;
 	final String? referenciaPedido;
+	final String? maintenanceOrderId;
+	final String? workflowStatus;
 	final SeguimientoCompraEstado estado;
 
 	/// Eventos ordenados cronológicamente (más antiguo primero).
 	final List<SeguimientoEvento> trayecto;
+
+	bool get puedeAvisarLlegada =>
+			workflowStatus == "compras_oc_notified" &&
+			maintenanceOrderId != null &&
+			maintenanceOrderId!.isNotEmpty;
 }
 
 Color _colorEstado(SeguimientoCompraEstado e) {
@@ -75,13 +88,24 @@ String _fmtFechaHora(DateTime d) {
 }
 
 /// Listado dinámico: color por estado; al tocar un ítem se abre el detalle del trayecto.
-class ProductoSeguimientoPanel extends StatelessWidget {
+class ProductoSeguimientoPanel extends ConsumerWidget {
 	const ProductoSeguimientoPanel({
 		super.key,
 		required this.items,
 	});
 
 	final List<ProductoSeguimiento> items;
+
+	static Future<void> avisarLlegadaPlanta(
+		WidgetRef ref,
+		ProductoSeguimiento item,
+	) async {
+		final oid = item.maintenanceOrderId;
+		if (oid == null || !item.puedeAvisarLlegada) return;
+		await ref.read(comprasStockRepositoryProvider).comprasNotifyMaterialArrived(oid);
+		ref.invalidate(panolSeguimientoComprasProvider);
+		ref.invalidate(mantenimientoNotificacionesProvider);
+	}
 
 	static void mostrarTrayecto(BuildContext context, ProductoSeguimiento p) {
 		final ordenados = [...p.trayecto]..sort((a, b) => a.cuando.compareTo(b.cuando));
@@ -174,7 +198,7 @@ class ProductoSeguimientoPanel extends StatelessWidget {
 	}
 
 	@override
-	Widget build(BuildContext context) {
+	Widget build(BuildContext context, WidgetRef ref) {
 		if (items.isEmpty) {
 			return Center(
 				child: Text(
@@ -196,6 +220,28 @@ class ProductoSeguimientoPanel extends StatelessWidget {
 					item: p,
 					colorEstado: c,
 					onTap: () => mostrarTrayecto(context, p),
+					onAvisarLlegada: p.puedeAvisarLlegada
+							? () async {
+									try {
+										await avisarLlegadaPlanta(ref, p);
+										if (!context.mounted) return;
+										ScaffoldMessenger.of(context).showSnackBar(
+											SnackBar(
+												content: Text(
+													"Aviso enviado: ${p.producto} llegó a planta.",
+												),
+											),
+										);
+									} catch (e) {
+										if (!context.mounted) return;
+										ScaffoldMessenger.of(context).showSnackBar(
+											SnackBar(
+												content: Text("No se pudo avisar la llegada: $e"),
+											),
+										);
+									}
+								}
+							: null,
 				);
 			},
 		);
@@ -207,115 +253,144 @@ class _ProductoSeguimientoCard extends StatelessWidget {
 		required this.item,
 		required this.colorEstado,
 		required this.onTap,
+		this.onAvisarLlegada,
 	});
 
 	final ProductoSeguimiento item;
 	final Color colorEstado;
 	final VoidCallback onTap;
+	final Future<void> Function()? onAvisarLlegada;
 
 	@override
 	Widget build(BuildContext context) {
 		return Material(
 			color: Colors.transparent,
-			child: InkWell(
-				onTap: onTap,
-				borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-				child: Ink(
-					decoration: BoxDecoration(
-						color: AppTokens.whiteSurface,
-						borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-						border: Border.all(color: AppTokens.greyBorder),
-						boxShadow: [
-							BoxShadow(
-								color: Colors.black.withValues(alpha: 0.04),
-								blurRadius: 6,
-								offset: const Offset(0, 2),
-							),
-						],
-					),
-					child: IntrinsicHeight(
-						child: Row(
-							crossAxisAlignment: CrossAxisAlignment.stretch,
-							children: [
-								Container(
-									width: 6,
-									decoration: BoxDecoration(
-										color: colorEstado,
-										borderRadius: const BorderRadius.horizontal(
-											left: Radius.circular(AppTokens.radiusMd - 1),
-										),
-									),
+			child: Ink(
+				decoration: BoxDecoration(
+					color: AppTokens.whiteSurface,
+					borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+					border: Border.all(color: AppTokens.greyBorder),
+					boxShadow: [
+						BoxShadow(
+							color: Colors.black.withValues(alpha: 0.04),
+							blurRadius: 6,
+							offset: const Offset(0, 2),
+						),
+					],
+				),
+				child: Column(
+					crossAxisAlignment: CrossAxisAlignment.stretch,
+					children: [
+						InkWell(
+							onTap: onTap,
+							borderRadius: BorderRadius.vertical(
+								top: const Radius.circular(AppTokens.radiusMd),
+								bottom: Radius.circular(
+									onAvisarLlegada != null ? 0 : AppTokens.radiusMd,
 								),
-								Expanded(
-									child: Padding(
-										padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
-										child: Row(
-											children: [
-												Expanded(
-													child: Column(
-														crossAxisAlignment: CrossAxisAlignment.start,
-														children: [
-															Text(
-																item.producto,
-																style: const TextStyle(
-																	fontWeight: FontWeight.w700,
-																	fontSize: 16,
-																	color: Colors.black87,
-																),
-															),
-															const SizedBox(height: 6),
-															Wrap(
-																spacing: 8,
-																runSpacing: 4,
-																crossAxisAlignment: WrapCrossAlignment.center,
+							),
+							child: IntrinsicHeight(
+								child: Row(
+									crossAxisAlignment: CrossAxisAlignment.stretch,
+									children: [
+										Container(
+											width: 6,
+											decoration: BoxDecoration(
+												color: colorEstado,
+												borderRadius: BorderRadius.horizontal(
+													left: const Radius.circular(AppTokens.radiusMd - 1),
+													right: onAvisarLlegada != null
+															? Radius.zero
+															: const Radius.circular(0),
+												),
+											),
+										),
+										Expanded(
+											child: Padding(
+												padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+												child: Row(
+													children: [
+														Expanded(
+															child: Column(
+																crossAxisAlignment: CrossAxisAlignment.start,
 																children: [
-																	Container(
-																		padding: const EdgeInsets.symmetric(
-																			horizontal: 8,
-																			vertical: 3,
-																		),
-																		decoration: BoxDecoration(
-																			color: colorEstado.withValues(
-																				alpha: 0.18,
-																			),
-																			borderRadius: BorderRadius.circular(6),
-																		),
-																		child: Text(
-																			_etiquetaEstado(item.estado),
-																			style: TextStyle(
-																				fontSize: 11,
-																				fontWeight: FontWeight.w800,
-																				color: colorEstado,
-																			),
+																	Text(
+																		item.producto,
+																		style: const TextStyle(
+																			fontWeight: FontWeight.w700,
+																			fontSize: 16,
+																			color: Colors.black87,
 																		),
 																	),
-																	if (item.referenciaPedido != null &&
-																			item.referenciaPedido!
-																					.trim()
-																					.isNotEmpty)
-																		Text(
-																			item.referenciaPedido!.trim(),
-																			style: TextStyle(
-																				fontSize: 12,
-																				color: Colors.grey.shade700,
+																	const SizedBox(height: 6),
+																	Wrap(
+																		spacing: 8,
+																		runSpacing: 4,
+																		crossAxisAlignment: WrapCrossAlignment.center,
+																		children: [
+																			Container(
+																				padding: const EdgeInsets.symmetric(
+																					horizontal: 8,
+																					vertical: 3,
+																				),
+																				decoration: BoxDecoration(
+																					color: colorEstado.withValues(
+																						alpha: 0.18,
+																					),
+																					borderRadius: BorderRadius.circular(6),
+																				),
+																				child: Text(
+																					_etiquetaEstado(item.estado),
+																					style: TextStyle(
+																						fontSize: 11,
+																						fontWeight: FontWeight.w800,
+																						color: colorEstado,
+																					),
+																				),
 																			),
-																		),
+																			if (item.referenciaPedido != null &&
+																					item.referenciaPedido!
+																							.trim()
+																							.isNotEmpty)
+																				Text(
+																					item.referenciaPedido!.trim(),
+																					style: TextStyle(
+																						fontSize: 12,
+																						color: Colors.grey.shade700,
+																					),
+																				),
+																		],
+																	),
 																],
 															),
-														],
-													),
+														),
+														Icon(
+															Icons.chevron_right,
+															color: Colors.grey.shade600,
+														),
+													],
 												),
-												Icon(
-													Icons.chevron_right,
-													color: Colors.grey.shade600,
-												),
-											],
+											),
 										),
+									],
+								),
+							),
+						),
+						if (onAvisarLlegada != null)
+							Padding(
+								padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+								child: FilledButton.icon(
+									onPressed: onAvisarLlegada,
+									icon: const Icon(Icons.inventory_2, size: 20),
+									label: const Text("Avisar llegada a planta"),
+									style: FilledButton.styleFrom(
+										backgroundColor: AppTokens.statusOk,
+										foregroundColor: Colors.white,
+										padding: const EdgeInsets.symmetric(vertical: 12),
 									),
 								),
-							],
-						),
-					),
+							),
+					],
 				),
 			),
 		);
