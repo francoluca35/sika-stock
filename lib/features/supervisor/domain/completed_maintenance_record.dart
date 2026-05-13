@@ -21,6 +21,9 @@ class CompletedMaintenanceRecord {
 		final motivo = switch (ws) {
 			MaintenanceWorkflowStatus.completed => "Entregado",
 			MaintenanceWorkflowStatus.forwardedToPanol => "Consulta con pañol",
+			MaintenanceWorkflowStatus.panolRequestedCompras => "Seguimiento con compras",
+			MaintenanceWorkflowStatus.comprasOcNotified => "Consulta (OC emitida)",
+			MaintenanceWorkflowStatus.comprasArrivedNotified => "Material en planta",
 			MaintenanceWorkflowStatus.cancelled => "Cancelado",
 			_ => "Cerrado",
 		};

@@ -1,24 +1,31 @@
 import "package:flutter/material.dart";
+import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
+import "../../auth/application/auth_providers.dart";
+import "../../auth/domain/app_role.dart";
 import "../../orders/presentation/widgets/order_hub_bottom_bar.dart";
 import "widgets/stock_screen_header.dart";
 
+void _stockHomeSoon(BuildContext context, String msg) {
+	ScaffoldMessenger.of(context).showSnackBar(
+		SnackBar(content: Text("$msg — próximamente.")),
+	);
+}
+
 /// Hub **Stock**: AGREGAR / HISTORIAL / ALERTAS / CATEGORÍAS + barra inferior Pedido · Historial · Perfil.
 /// Ruta dedicada `/stock`; Mantenimiento entra por su propia pantalla en `/home`.
-class StockHomeScreen extends StatelessWidget {
+class StockHomeScreen extends ConsumerWidget {
 	const StockHomeScreen({super.key});
 
-	void _soon(BuildContext context, String msg) {
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(content: Text("$msg — próximamente.")),
-		);
-	}
-
 	@override
-	Widget build(BuildContext context) {
+	Widget build(BuildContext context, WidgetRef ref) {
 		final bottomInset = MediaQuery.paddingOf(context).bottom;
+		final puedeGestionarStock = ref.watch(currentProfileProvider).maybeWhen(
+			data: (p) => appRolePuedeGestionarStock(p?.rol),
+			orElse: () => false,
+		);
 
 		return Scaffold(
 			backgroundColor: AppTokens.surfacePage,
@@ -55,8 +62,22 @@ class StockHomeScreen extends StatelessWidget {
 													badge: true,
 												),
 												title: "AGREGAR STOCK",
-												subtitle: "Registrar entradas y salidas de stock",
-												onTap: () => context.push("/stock/agregar"),
+												subtitle: puedeGestionarStock
+														? "Registrar entradas y salidas de stock"
+														: "Solo el rol Pañol puede registrar stock",
+												onTap: () {
+													if (!puedeGestionarStock) {
+														ScaffoldMessenger.of(context).showSnackBar(
+															const SnackBar(
+																content: Text(
+																	"Solo usuarios con rol Pañol pueden agregar stock.",
+																),
+															),
+														);
+														return;
+													}
+													context.push("/stock/agregar");
+												},
 											),
 											const SizedBox(height: 16),
 											_StockMenuCard(
@@ -71,7 +92,7 @@ class StockHomeScreen extends StatelessWidget {
 												),
 												title: "HISTORIAL DE STOCK",
 												subtitle: "Ver movimientos y registros de stock",
-												onTap: () => _soon(context, "Historial de stock"),
+												onTap: () => _stockHomeSoon(context, "Historial de stock"),
 											),
 											const SizedBox(height: 16),
 											_StockMenuCard(
@@ -86,7 +107,7 @@ class StockHomeScreen extends StatelessWidget {
 												),
 												title: "ALERTAS",
 												subtitle: "Ver productos con stock bajo o crítico",
-												onTap: () => _soon(context, "Alertas de stock"),
+												onTap: () => _stockHomeSoon(context, "Alertas de stock"),
 											),
 											const SizedBox(height: 16),
 											_StockMenuCard(
@@ -117,7 +138,7 @@ class StockHomeScreen extends StatelessWidget {
 						selectedIndex: null,
 						onPedido: () => context.push("/pedidos/nuevo"),
 						onHistorial: () => context.push("/pedidos/mis-pedidos"),
-						onPerfil: () => _soon(context, "Perfil"),
+						onPerfil: () => _stockHomeSoon(context, "Perfil"),
 					),
 				],
 			),

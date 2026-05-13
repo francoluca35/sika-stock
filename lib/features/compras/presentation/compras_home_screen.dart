@@ -4,6 +4,8 @@ import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
+import "../application/compras_in_app_notifications_provider.dart";
+import "../application/compras_stock_repository_provider.dart";
 
 /// Pantalla inicial **Compras**: BIENVENIDO + tarjetas + barra inferior Compras · Perfil.
 class ComprasHomeScreen extends ConsumerStatefulWidget {
@@ -134,7 +136,116 @@ class _ComprasHeader extends StatelessWidget {
 	}
 }
 
-class _ComprasMainTab extends StatelessWidget {
+class _ComprasNotificationsBlock extends ConsumerWidget {
+	const _ComprasNotificationsBlock();
+
+	@override
+	Widget build(BuildContext context, WidgetRef ref) {
+		final async = ref.watch(comprasInAppNotificationsProvider);
+		return async.when(
+			data: (list) {
+				final panol = list
+						.where((n) => n.kind == "panol_stock_request")
+						.where((n) => n.isUnread)
+						.take(8)
+						.toList();
+				if (panol.isEmpty) return const SizedBox.shrink();
+				return Material(
+					color: const Color(0xFFFFF8E1),
+					borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+					elevation: 0,
+					child: Container(
+						decoration: BoxDecoration(
+							borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+							border: Border.all(color: Colors.amber.shade700),
+						),
+						padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+						child: Column(
+							crossAxisAlignment: CrossAxisAlignment.stretch,
+							children: [
+								Row(
+									children: [
+										Icon(
+											Icons.notifications_active_outlined,
+											size: 20,
+											color: Colors.amber.shade900,
+										),
+										const SizedBox(width: 8),
+										Text(
+											"Nuevos pedidos desde pañol",
+											style: TextStyle(
+												fontWeight: FontWeight.bold,
+												fontSize: 14,
+												color: Colors.amber.shade900,
+											),
+										),
+									],
+								),
+								const SizedBox(height: 8),
+								for (final n in panol)
+									Padding(
+										padding: const EdgeInsets.only(bottom: 8),
+										child: Material(
+											color: AppTokens.whiteSurface,
+											borderRadius: BorderRadius.circular(8),
+											child: Padding(
+												padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
+												child: Row(
+													crossAxisAlignment: CrossAxisAlignment.start,
+													children: [
+														Expanded(
+															child: Column(
+																crossAxisAlignment:
+																		CrossAxisAlignment.start,
+																children: [
+																	Text(
+																		n.title,
+																		style: TextStyle(
+																			fontWeight: FontWeight.w800,
+																			fontSize: 13,
+																			color: Colors.orange.shade900,
+																		),
+																	),
+																	const SizedBox(height: 4),
+																	Text(
+																		n.body,
+																		style: TextStyle(
+																			fontSize: 12.5,
+																			height: 1.25,
+																			color: Colors.grey.shade800,
+																		),
+																	),
+																],
+															),
+														),
+														TextButton(
+															onPressed: () async {
+																await ref
+																		.read(comprasStockRepositoryProvider)
+																		.markNotificationRead(n.id);
+																ref.invalidate(
+																	comprasInAppNotificationsProvider,
+																);
+															},
+															child: const Text("OK"),
+														),
+													],
+												),
+											),
+										),
+									),
+							],
+						),
+					),
+				);
+			},
+			loading: () => const SizedBox.shrink(),
+			error: (_, __) => const SizedBox.shrink(),
+		);
+	}
+}
+
+class _ComprasMainTab extends ConsumerWidget {
 	const _ComprasMainTab({
 		required this.onPedidos,
 		required this.onHistorialPedidos,
@@ -146,7 +257,7 @@ class _ComprasMainTab extends StatelessWidget {
 	final VoidCallback onHistorialCompras;
 
 	@override
-	Widget build(BuildContext context) {
+	Widget build(BuildContext context, WidgetRef ref) {
 		return SingleChildScrollView(
 			padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
 			child: Align(
@@ -200,7 +311,9 @@ class _ComprasMainTab extends StatelessWidget {
 									),
 								],
 							),
-							const SizedBox(height: 22),
+							const SizedBox(height: 16),
+							const _ComprasNotificationsBlock(),
+							const SizedBox(height: 12),
 							_ComprasMenuCard(
 								leadingDecoration: const BoxDecoration(
 									color: AppTokens.redAction,

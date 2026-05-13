@@ -4,9 +4,28 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
+import "../../auth/application/auth_providers.dart";
+import "../../auth/domain/app_role.dart";
+import "../../auth/domain/profile_row.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
+import "../../stock/presentation/widgets/add_stock_form_panel.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
+
+/// Ancho por debajo del cual el stock Pañol usa layout compacto (escritorio ≥720px sin cambios).
+bool _panolStockLayoutCompact(BuildContext context) =>
+		MediaQuery.sizeOf(context).width < 720;
+
+/// Orden / filtro de la lista de stock (pantalla Pañol).
+enum _PanolStockFilterSort {
+	/// Mismo orden que el catálogo.
+	catalogo,
+	mayorCantidad,
+	menorCantidad,
+	/// Solo filas con cantidad 0.
+	soloSinStock,
+	alfabeticoNombre,
+}
 
 /// Pantalla **Stock** Pañol: acciones + tabla (navegación desde la home).
 class PanolStockScreen extends ConsumerStatefulWidget {
@@ -20,6 +39,9 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 	bool _modoEdicion = false;
 	bool _modoEliminar = false;
 	final Set<String> _idsSeleccionados = <String>{};
+
+	_PanolStockFilterSort _filtroOrden = _PanolStockFilterSort.catalogo;
+	String _busqueda = "";
 
 	void _setModoEdicion(bool activo) {
 		setState(() {
@@ -43,6 +65,24 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 		});
 	}
 
+	Future<void> _abrirBottomSheetAgregar() async {
+		setState(() {
+			_modoEdicion = false;
+			_modoEliminar = false;
+			_idsSeleccionados.clear();
+		});
+		if (!mounted) return;
+		await showModalBottomSheet<void>(
+			context: context,
+			isScrollControlled: true,
+			useSafeArea: true,
+			backgroundColor: Colors.transparent,
+			builder: (ctx) => _PanolAddStockBottomSheet(
+				onClose: () => Navigator.of(ctx).pop(),
+			),
+		);
+	}
+
 	void _toggleSeleccionFila(String id, bool? seleccionado) {
 		setState(() {
 			if (seleccionado == true) {
@@ -51,12 +91,6 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 				_idsSeleccionados.remove(id);
 			}
 		});
-	}
-
-	void _soon(BuildContext context, String msg) {
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(content: Text("$msg — próximamente.")),
-		);
 	}
 
 	String _codigoStock(StockProduct p) {
@@ -68,6 +102,66 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 	}
 
 	bool _bajoStock(StockProduct p) => p.cantidad == 0 || p.cantidad < 15;
+
+	bool get _hayFiltrosActivos =>
+			_busqueda.trim().isNotEmpty || _filtroOrden != _PanolStockFilterSort.catalogo;
+
+	List<StockProduct> _productosVisibles(List<StockProduct> todos) {
+		final q = _busqueda.trim().toLowerCase();
+		var list = List<StockProduct>.from(todos);
+		if (q.isNotEmpty) {
+			list = list.where((p) {
+				final cod = _codigoStock(p).toLowerCase();
+				return p.nombre.toLowerCase().contains(q) ||
+						p.categoria.toLowerCase().contains(q) ||
+						cod.contains(q);
+			}).toList();
+		}
+		if (_filtroOrden == _PanolStockFilterSort.soloSinStock) {
+			list = list.where((p) => p.cantidad == 0).toList();
+		}
+		switch (_filtroOrden) {
+			case _PanolStockFilterSort.catalogo:
+				break;
+			case _PanolStockFilterSort.mayorCantidad:
+				list.sort((a, b) {
+					final c = b.cantidad.compareTo(a.cantidad);
+					return c != 0 ? c : a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase());
+				});
+				break;
+			case _PanolStockFilterSort.menorCantidad:
+				list.sort((a, b) {
+					final c = a.cantidad.compareTo(b.cantidad);
+					return c != 0 ? c : a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase());
+				});
+				break;
+			case _PanolStockFilterSort.soloSinStock:
+				list.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+				break;
+			case _PanolStockFilterSort.alfabeticoNombre:
+				list.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
+				break;
+		}
+		return list;
+	}
+
+	Future<void> _abrirBottomSheetFiltros() async {
+		final result = await showModalBottomSheet<({String q, _PanolStockFilterSort orden})>(
+			context: context,
+			isScrollControlled: true,
+			useSafeArea: true,
+			backgroundColor: Colors.transparent,
+			builder: (ctx) => _PanolFiltrosStockBottomSheet(
+				busquedaInicial: _busqueda,
+				ordenInicial: _filtroOrden,
+			),
+		);
+		if (!mounted || result == null) return;
+		setState(() {
+			_busqueda = result.q;
+			_filtroOrden = result.orden;
+		});
+	}
 
 	void _back(BuildContext context) {
 		if (context.canPop()) {
@@ -104,15 +198,22 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 			),
 		);
 		if (!mounted || ok != true) return;
-		ref.read(supervisorStockCatalogProvider.notifier).removeByIds(ids);
-		setState(() {
-			_idsSeleccionados.clear();
-			_modoEliminar = false;
-		});
-		if (!mounted) return;
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(content: Text(n == 1 ? "Producto eliminado." : "Se eliminaron $n productos.")),
-		);
+		try {
+			await ref.read(supervisorStockCatalogProvider.notifier).removeByIds(ids);
+			if (!mounted) return;
+			setState(() {
+				_idsSeleccionados.clear();
+				_modoEliminar = false;
+			});
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text(n == 1 ? "Producto eliminado." : "Se eliminaron $n productos.")),
+			);
+		} catch (e) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudo eliminar: $e")),
+			);
+		}
 	}
 
 	Future<void> _abrirModalEdicion(StockProduct producto) async {
@@ -122,17 +223,206 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 			builder: (ctx) => _EditarProductoStockDialog(producto: producto),
 		);
 		if (!mounted || guardado == null) return;
-		ref.read(supervisorStockCatalogProvider.notifier).replaceProduct(guardado);
-		ScaffoldMessenger.of(context).showSnackBar(
-			const SnackBar(content: Text("Cambios guardados.")),
+		try {
+			await ref.read(supervisorStockCatalogProvider.notifier).replaceProduct(guardado);
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(content: Text("Cambios guardados.")),
+			);
+		} catch (e) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudo guardar: $e")),
+			);
+		}
+	}
+
+	Widget _buildMobileProductCards(List<StockProduct> productos, bool puedeGestionar) {
+		return Padding(
+			padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
+			child: Column(
+				crossAxisAlignment: CrossAxisAlignment.stretch,
+				children: [
+					for (final p in productos)
+						Padding(
+							padding: const EdgeInsets.only(bottom: 10),
+							child: _mobileProductCard(p, puedeGestionar),
+						),
+				],
+			),
+		);
+	}
+
+	Widget _mobileProductCard(StockProduct p, bool puedeGestionar) {
+		final cod = _codigoStock(p);
+		final sel = _idsSeleccionados.contains(p.id);
+		return Material(
+			color: sel ? AppTokens.redAction.withValues(alpha: 0.12) : AppTokens.surfaceMuted,
+			shape: RoundedRectangleBorder(
+				borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+				side: BorderSide(color: AppTokens.greyBorder),
+			),
+			child: InkWell(
+				borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+				onTap: !puedeGestionar
+						? null
+						: _modoEliminar
+								? () {
+										setState(() => _toggleSeleccionFila(p.id, !sel));
+									}
+								: _modoEdicion && !_modoEliminar
+										? () => _abrirModalEdicion(p)
+										: null,
+				child: Padding(
+					padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+					child: Row(
+						crossAxisAlignment: CrossAxisAlignment.start,
+						children: [
+							if (puedeGestionar && _modoEliminar) ...[
+								Checkbox(
+									value: sel,
+									onChanged: (v) => setState(() => _toggleSeleccionFila(p.id, v)),
+								),
+								const SizedBox(width: 4),
+							],
+							Expanded(
+								child: Column(
+									crossAxisAlignment: CrossAxisAlignment.start,
+									children: [
+										Text(
+											cod,
+											style: const TextStyle(
+												fontWeight: FontWeight.w800,
+												fontSize: 12,
+												letterSpacing: 0.4,
+												color: Colors.black87,
+											),
+										),
+										const SizedBox(height: 6),
+										Text(
+											p.nombre,
+											style: const TextStyle(
+												fontWeight: FontWeight.w600,
+												fontSize: 16,
+												height: 1.25,
+												color: Colors.black87,
+											),
+										),
+										const SizedBox(height: 4),
+										Text(
+											"USO · ${p.categoria}",
+											style: TextStyle(
+												fontSize: 13,
+												height: 1.3,
+												color: Colors.grey.shade700,
+											),
+											maxLines: 4,
+											overflow: TextOverflow.ellipsis,
+										),
+										const SizedBox(height: 10),
+										Row(
+											children: [
+												Text(
+													"Cantidad: ${p.cantidad}",
+													style: const TextStyle(
+														fontWeight: FontWeight.w600,
+														fontSize: 14,
+														color: Colors.black87,
+													),
+												),
+												const Spacer(),
+												_EstadoStockChip(bajo: _bajoStock(p)),
+											],
+										),
+									],
+								),
+							),
+						],
+					),
+				),
+			),
 		);
 	}
 
 	@override
 	Widget build(BuildContext context) {
-		final productos = ref.watch(supervisorStockCatalogProvider);
+		ref.listen<AsyncValue<ProfileRow?>>(currentProfileProvider, (prev, next) {
+			next.whenData((p) {
+				if (!appRolePuedeGestionarStock(p?.rol) && mounted) {
+					setState(() {
+						_modoEdicion = false;
+						_modoEliminar = false;
+						_idsSeleccionados.clear();
+					});
+				}
+			});
+		});
+		final puedeGestionar = ref.watch(currentProfileProvider).maybeWhen(
+			data: (p) => appRolePuedeGestionarStock(p?.rol),
+			orElse: () => false,
+		);
+		final catalogAsync = ref.watch(supervisorStockCatalogProvider);
+		final compact = _panolStockLayoutCompact(context);
 
-		return Scaffold(
+		return catalogAsync.when(
+			loading: () => Scaffold(
+				backgroundColor: AppTokens.surfacePage,
+				body: Column(
+					crossAxisAlignment: CrossAxisAlignment.stretch,
+					children: [
+						StockScreenHeader(
+							title: "STOCK",
+							onBack: () => _back(context),
+						),
+						const Expanded(
+							child: Center(child: CircularProgressIndicator()),
+						),
+					],
+				),
+			),
+			error: (e, _) => Scaffold(
+				backgroundColor: AppTokens.surfacePage,
+				body: Column(
+					crossAxisAlignment: CrossAxisAlignment.stretch,
+					children: [
+						StockScreenHeader(
+							title: "STOCK",
+							onBack: () => _back(context),
+						),
+						Expanded(
+							child: Center(
+								child: Padding(
+									padding: const EdgeInsets.all(24),
+									child: Column(
+										mainAxisSize: MainAxisSize.min,
+										children: [
+											const Text(
+												"No se pudo cargar el stock.",
+												textAlign: TextAlign.center,
+											),
+											const SizedBox(height: 8),
+											Text(
+												"$e",
+												textAlign: TextAlign.center,
+												style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+											),
+											const SizedBox(height: 16),
+											FilledButton(
+												onPressed: () =>
+														ref.invalidate(supervisorStockCatalogProvider),
+												child: const Text("Reintentar"),
+											),
+										],
+									),
+								),
+							),
+						),
+					],
+				),
+			),
+			data: (productos) {
+				final visibles = _productosVisibles(productos);
+				return Scaffold(
 			backgroundColor: AppTokens.surfacePage,
 			body: Column(
 				crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -144,15 +434,22 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 					Padding(
 						padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
 						child: Align(
-							alignment: Alignment.centerRight,
+							alignment: compact ? Alignment.center : Alignment.centerRight,
 							child: TextButton.icon(
-								onPressed: () => context.push("/panol/stock-opciones"),
-								icon: const Icon(Icons.tune, size: 20, color: Colors.black87),
-								label: const Text(
-									"Opciones (categorías, alertas…)",
+								onPressed: _abrirBottomSheetFiltros,
+								icon: Icon(
+									_hayFiltrosActivos ? Icons.filter_alt : Icons.tune,
+									size: 20,
+									color: Colors.black87,
+								),
+								label: Text(
+									_hayFiltrosActivos
+											? "Filtros y búsqueda (activos)"
+											: "Filtros y búsqueda",
 									style: TextStyle(
 										fontWeight: FontWeight.w600,
 										color: Colors.black87,
+										fontSize: compact ? 13 : 14,
 									),
 								),
 							),
@@ -176,61 +473,169 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 											children: [
 												Padding(
 													padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
-													child: Wrap(
-														spacing: 8,
-														runSpacing: 8,
-														alignment: WrapAlignment.start,
-														children: [
-															_PanolToolbarBtn(
-																label: _modoEdicion ? "LISTO" : "EDITAR",
-																icon: _modoEdicion ? Icons.check : Icons.edit_outlined,
-																bg: _modoEdicion
-																		? AppTokens.statusOk
-																		: AppTokens.yellowHeader,
-																fg: _modoEdicion ? Colors.white : Colors.black87,
-																onPressed: () => _setModoEdicion(!_modoEdicion),
-															),
-															_PanolToolbarBtn(
-																label: "AÑADIR",
-																icon: Icons.add,
-																bg: AppTokens.yellowHeader,
-																fg: Colors.black87,
-																onPressed: () => context.push("/stock/agregar"),
-															),
-															_PanolToolbarBtn(
-																label: _modoEliminar ? "LISTO" : "ELIMINAR",
-																icon: _modoEliminar ? Icons.check : Icons.delete_outline,
-																bg: _modoEliminar
-																		? AppTokens.statusOk
-																		: AppTokens.redAction,
-																fg: Colors.white,
-																onPressed: () => _setModoEliminar(!_modoEliminar),
-															),
-															if (_modoEliminar)
-																_PanolToolbarBtn(
-																	label: _idsSeleccionados.isEmpty
-																			? "ELIMINAR SELECCIÓN"
-																			: "ELIMINAR (${_idsSeleccionados.length})",
-																	icon: Icons.delete_forever_outlined,
-																	bg: AppTokens.redAction,
-																	fg: Colors.white,
-																	onPressed: _idsSeleccionados.isEmpty
-																			? null
-																			: () {
-																					_confirmarEliminarSeleccion();
-																				},
+													child: !puedeGestionar
+															? Align(
+																	alignment: Alignment.centerLeft,
+																	child: Padding(
+																		padding: const EdgeInsets.symmetric(vertical: 6),
+																		child: Text(
+																			"Solo lectura. Agregar, editar o quitar productos "
+																			"corresponde al rol Pañol.",
+																			style: TextStyle(
+																				fontSize: 13,
+																				height: 1.35,
+																				color: Colors.grey.shade800,
+																				fontWeight: FontWeight.w600,
+																			),
+																		),
+																	),
+																)
+															: compact
+																	? LayoutBuilder(
+																	builder: (context, c) {
+																		final gap = 8.0;
+																		final colW = (c.maxWidth - gap) / 2;
+																		Widget cell(_PanolToolbarBtn btn) => SizedBox(
+																					width: colW,
+																					child: btn,
+																				);
+																		return Column(
+																			crossAxisAlignment:
+																					CrossAxisAlignment.stretch,
+																			children: [
+																				Row(
+																					children: [
+																						cell(
+																							_PanolToolbarBtn(
+																								stretch: true,
+																								label: _modoEdicion
+																										? "LISTO"
+																										: "EDITAR",
+																								icon: _modoEdicion
+																										? Icons.check
+																										: Icons.edit_outlined,
+																								bg: _modoEdicion
+																										? AppTokens.statusOk
+																										: AppTokens.yellowHeader,
+																								fg: _modoEdicion
+																										? Colors.white
+																										: Colors.black87,
+																								onPressed: () =>
+																										_setModoEdicion(
+																											!_modoEdicion,
+																										),
+																							),
+																						),
+																						SizedBox(width: gap),
+																						cell(
+																							_PanolToolbarBtn(
+																								stretch: true,
+																								label: "AÑADIR",
+																								icon: Icons.add,
+																								bg: AppTokens.yellowHeader,
+																								fg: Colors.black87,
+																								onPressed:
+																										_abrirBottomSheetAgregar,
+																							),
+																						),
+																					],
+																				),
+																				SizedBox(height: gap),
+																				Row(
+																					children: [
+																						Expanded(
+																							child: _PanolToolbarBtn(
+																								stretch: true,
+																								label: _modoEliminar
+																										? "LISTO"
+																										: "ELIMINAR",
+																								icon: _modoEliminar
+																										? Icons.check
+																										: Icons
+																												.delete_outline,
+																								bg: _modoEliminar
+																										? AppTokens.statusOk
+																										: AppTokens.redAction,
+																								fg: Colors.white,
+																								onPressed: () =>
+																										_setModoEliminar(
+																											!_modoEliminar,
+																										),
+																							),
+																						),
+																					],
+																				),
+																				if (_modoEliminar) ...[
+																					SizedBox(height: gap),
+																					_PanolToolbarBtn(
+																						stretch: true,
+																						label: _idsSeleccionados.isEmpty
+																								? "ELIMINAR SELECCIÓN"
+																								: "ELIMINAR (${_idsSeleccionados.length})",
+																						icon: Icons.delete_forever_outlined,
+																						bg: AppTokens.redAction,
+																						fg: Colors.white,
+																						onPressed: _idsSeleccionados.isEmpty
+																								? null
+																								: _confirmarEliminarSeleccion,
+																					),
+																				],
+																			],
+																		);
+																	},
+																)
+															: Wrap(
+																	spacing: 8,
+																	runSpacing: 8,
+																	alignment: WrapAlignment.start,
+																	children: [
+																		_PanolToolbarBtn(
+																			label: _modoEdicion ? "LISTO" : "EDITAR",
+																			icon: _modoEdicion
+																					? Icons.check
+																					: Icons.edit_outlined,
+																			bg: _modoEdicion
+																					? AppTokens.statusOk
+																					: AppTokens.yellowHeader,
+																			fg: _modoEdicion ? Colors.white : Colors.black87,
+																			onPressed: () => _setModoEdicion(!_modoEdicion),
+																		),
+																		_PanolToolbarBtn(
+																			label: "AÑADIR",
+																			icon: Icons.add,
+																			bg: AppTokens.yellowHeader,
+																			fg: Colors.black87,
+																			onPressed: _abrirBottomSheetAgregar,
+																		),
+																		_PanolToolbarBtn(
+																			label: _modoEliminar ? "LISTO" : "ELIMINAR",
+																			icon: _modoEliminar
+																					? Icons.check
+																					: Icons.delete_outline,
+																			bg: _modoEliminar
+																					? AppTokens.statusOk
+																					: AppTokens.redAction,
+																			fg: Colors.white,
+																			onPressed: () => _setModoEliminar(!_modoEliminar),
+																		),
+																		if (_modoEliminar)
+																			_PanolToolbarBtn(
+																				label: _idsSeleccionados.isEmpty
+																						? "ELIMINAR SELECCIÓN"
+																						: "ELIMINAR (${_idsSeleccionados.length})",
+																				icon: Icons.delete_forever_outlined,
+																				bg: AppTokens.redAction,
+																				fg: Colors.white,
+																				onPressed: _idsSeleccionados.isEmpty
+																						? null
+																						: () {
+																								_confirmarEliminarSeleccion();
+																							},
+																			),
+																	],
 																),
-															_PanolToolbarBtn(
-																label: "UTILIZAR",
-																icon: Icons.build_outlined,
-																bg: AppTokens.yellowHeader,
-																fg: Colors.black87,
-																onPressed: () => _soon(context, "Utilizar material"),
-															),
-														],
-													),
 												),
-												if (_modoEdicion)
+												if (_modoEdicion && puedeGestionar)
 													Padding(
 														padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
 														child: DecoratedBox(
@@ -267,7 +672,7 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 															),
 														),
 													),
-												if (_modoEliminar)
+												if (_modoEliminar && puedeGestionar)
 													Padding(
 														padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
 														child: DecoratedBox(
@@ -305,21 +710,41 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 														),
 													),
 												const Divider(height: 1),
-												LayoutBuilder(
-													builder: (context, constraints) {
-														return SingleChildScrollView(
-															scrollDirection: Axis.horizontal,
-															child: ConstrainedBox(
-																constraints: BoxConstraints(
-																	minWidth: constraints.maxWidth,
-																),
-																child: DataTable(
-																	showCheckboxColumn: _modoEliminar,
+												if (visibles.isEmpty)
+													Padding(
+														padding: const EdgeInsets.fromLTRB(16, 28, 16, 36),
+														child: Text(
+															productos.isEmpty
+																	? "No hay productos en el catálogo."
+																	: "No hay productos que coincidan con los filtros o la búsqueda.",
+															textAlign: TextAlign.center,
+															style: TextStyle(
+																fontSize: 14,
+																height: 1.35,
+																color: Colors.grey.shade700,
+															),
+														),
+													)
+												else if (compact)
+													_buildMobileProductCards(visibles, puedeGestionar)
+												else
+													LayoutBuilder(
+														builder: (context, constraints) {
+															return SingleChildScrollView(
+																scrollDirection: Axis.horizontal,
+																child: ConstrainedBox(
+																	constraints: BoxConstraints(
+																		minWidth: constraints.maxWidth,
+																	),
+																	child: DataTable(
+																	showCheckboxColumn: puedeGestionar && _modoEliminar,
 																	headingRowColor: WidgetStateProperty.all(
 																		AppTokens.surfaceMuted,
 																	),
 																	dataRowMinHeight:
-																			_modoEdicion || _modoEliminar ? 48 : 44,
+																			puedeGestionar && (_modoEdicion || _modoEliminar)
+																					? 48
+																					: 44,
 																	horizontalMargin: 12,
 																	columnSpacing: 16,
 																	columns: const [
@@ -333,16 +758,16 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 																		DataColumn(label: Text("ESTADO")),
 																	],
 																	rows: [
-																		for (final p in productos)
+																		for (final p in visibles)
 																			DataRow(
 																				selected: _idsSeleccionados.contains(p.id),
-																				onSelectChanged: _modoEliminar
+																				onSelectChanged: puedeGestionar && _modoEliminar
 																						? (v) => _toggleSeleccionFila(p.id, v)
 																						: null,
 																				cells: [
 																					DataCell(
 																						Text(_codigoStock(p)),
-																						onTap: _modoEdicion && !_modoEliminar
+																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
 																								? () => _abrirModalEdicion(p)
 																								: null,
 																					),
@@ -351,25 +776,25 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 																							p.nombre,
 																							overflow: TextOverflow.ellipsis,
 																						),
-																						onTap: _modoEdicion && !_modoEliminar
+																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
 																								? () => _abrirModalEdicion(p)
 																								: null,
 																					),
 																					DataCell(
 																						Text(p.categoria),
-																						onTap: _modoEdicion && !_modoEliminar
+																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
 																								? () => _abrirModalEdicion(p)
 																								: null,
 																					),
 																					DataCell(
 																						Text("${p.cantidad}"),
-																						onTap: _modoEdicion && !_modoEliminar
+																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
 																								? () => _abrirModalEdicion(p)
 																								: null,
 																					),
 																					DataCell(
 																						_EstadoStockChip(bajo: _bajoStock(p)),
-																						onTap: _modoEdicion && !_modoEliminar
+																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
 																								? () => _abrirModalEdicion(p)
 																								: null,
 																					),
@@ -380,7 +805,7 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 															),
 														);
 													},
-												),
+													),
 												const SizedBox(height: 8),
 											],
 										),
@@ -391,6 +816,286 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 					),
 				],
 			),
+		);
+			},
+		);
+	}
+}
+
+/// Bottom sheet: búsqueda + orden / filtro de la lista de stock.
+class _PanolFiltrosStockBottomSheet extends StatefulWidget {
+	const _PanolFiltrosStockBottomSheet({
+		required this.busquedaInicial,
+		required this.ordenInicial,
+	});
+
+	final String busquedaInicial;
+	final _PanolStockFilterSort ordenInicial;
+
+	@override
+	State<_PanolFiltrosStockBottomSheet> createState() => _PanolFiltrosStockBottomSheetState();
+}
+
+class _PanolFiltrosStockBottomSheetState extends State<_PanolFiltrosStockBottomSheet> {
+	late final TextEditingController _busquedaCtrl;
+	late _PanolStockFilterSort _orden;
+
+	@override
+	void initState() {
+		super.initState();
+		_busquedaCtrl = TextEditingController(text: widget.busquedaInicial);
+		_orden = widget.ordenInicial;
+	}
+
+	@override
+	void dispose() {
+		_busquedaCtrl.dispose();
+		super.dispose();
+	}
+
+	void _aplicar() {
+		Navigator.pop(
+			context,
+			(q: _busquedaCtrl.text.trim(), orden: _orden),
+		);
+	}
+
+	void _restablecer() {
+		Navigator.pop(
+			context,
+			(q: "", orden: _PanolStockFilterSort.catalogo),
+		);
+	}
+
+	@override
+	Widget build(BuildContext context) {
+		final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+		return Padding(
+			padding: EdgeInsets.only(bottom: bottomInset),
+			child: Align(
+				alignment: Alignment.bottomCenter,
+				child: ConstrainedBox(
+					constraints: const BoxConstraints(maxWidth: 560),
+					child: Material(
+						color: AppTokens.whiteSurface,
+						borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+						clipBehavior: Clip.antiAlias,
+						elevation: 12,
+						shadowColor: Colors.black38,
+						child: SafeArea(
+							top: false,
+							child: SingleChildScrollView(
+								padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+								child: Column(
+									mainAxisSize: MainAxisSize.min,
+									crossAxisAlignment: CrossAxisAlignment.stretch,
+									children: [
+										Center(
+											child: Container(
+												width: 40,
+												height: 4,
+												margin: const EdgeInsets.only(bottom: 12),
+												decoration: BoxDecoration(
+													color: Colors.grey.shade400,
+													borderRadius: BorderRadius.circular(2),
+												),
+											),
+										),
+										Row(
+											children: [
+												const Icon(Icons.filter_list, color: Colors.black87, size: 26),
+												const SizedBox(width: 10),
+												const Expanded(
+													child: Text(
+														"Filtros y búsqueda",
+														style: TextStyle(
+															fontWeight: FontWeight.bold,
+															fontSize: 17,
+															color: Colors.black87,
+														),
+													),
+												),
+												IconButton(
+													tooltip: "Cerrar",
+													onPressed: () => Navigator.pop(context),
+													icon: const Icon(Icons.close, color: Colors.black87),
+												),
+											],
+										),
+										const SizedBox(height: 8),
+										TextField(
+											controller: _busquedaCtrl,
+											textCapitalization: TextCapitalization.sentences,
+											decoration: InputDecoration(
+												isDense: true,
+												prefixIcon: const Icon(Icons.search, color: Colors.black54),
+												hintText: "Buscar por producto, código o categoría",
+												border: OutlineInputBorder(
+													borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+												),
+												filled: true,
+												fillColor: AppTokens.surfaceMuted,
+											),
+											onChanged: (_) => setState(() {}),
+										),
+										const SizedBox(height: 18),
+										Text(
+											"Orden y filtros",
+											style: TextStyle(
+												fontWeight: FontWeight.w700,
+												fontSize: 13,
+												color: Colors.grey.shade800,
+											),
+										),
+										const SizedBox(height: 6),
+										RadioListTile<_PanolStockFilterSort>(
+											dense: true,
+											title: const Text("Catálogo (orden por defecto)"),
+											value: _PanolStockFilterSort.catalogo,
+											groupValue: _orden,
+											onChanged: (v) => setState(() => _orden = v ?? _PanolStockFilterSort.catalogo),
+										),
+										RadioListTile<_PanolStockFilterSort>(
+											dense: true,
+											title: const Text("Mayor stock (más unidades primero)"),
+											value: _PanolStockFilterSort.mayorCantidad,
+											groupValue: _orden,
+											onChanged: (v) => setState(() => _orden = v ?? _PanolStockFilterSort.catalogo),
+										),
+										RadioListTile<_PanolStockFilterSort>(
+											dense: true,
+											title: const Text("Menor stock (menos unidades primero)"),
+											value: _PanolStockFilterSort.menorCantidad,
+											groupValue: _orden,
+											onChanged: (v) => setState(() => _orden = v ?? _PanolStockFilterSort.catalogo),
+										),
+										RadioListTile<_PanolStockFilterSort>(
+											dense: true,
+											title: const Text("Sin stock (solo cantidad 0)"),
+											value: _PanolStockFilterSort.soloSinStock,
+											groupValue: _orden,
+											onChanged: (v) => setState(() => _orden = v ?? _PanolStockFilterSort.catalogo),
+										),
+										RadioListTile<_PanolStockFilterSort>(
+											dense: true,
+											title: const Text("Orden alfabético (por nombre)"),
+											value: _PanolStockFilterSort.alfabeticoNombre,
+											groupValue: _orden,
+											onChanged: (v) => setState(() => _orden = v ?? _PanolStockFilterSort.catalogo),
+										),
+										const SizedBox(height: 16),
+										Row(
+											children: [
+												TextButton(
+													onPressed: _restablecer,
+													child: const Text("Restablecer"),
+												),
+												const Spacer(),
+												FilledButton(
+													style: FilledButton.styleFrom(
+														backgroundColor: AppTokens.redAction,
+														foregroundColor: Colors.white,
+													),
+													onPressed: _aplicar,
+													child: const Text("Listo"),
+												),
+											],
+										),
+									],
+								),
+							),
+						),
+					),
+				),
+			),
+		);
+	}
+}
+
+/// Bottom sheet estilo Android: panel redondeado desde abajo con asa y scroll.
+class _PanolAddStockBottomSheet extends StatelessWidget {
+	const _PanolAddStockBottomSheet({required this.onClose});
+
+	final VoidCallback onClose;
+
+	@override
+	Widget build(BuildContext context) {
+		final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+		final maxH = MediaQuery.sizeOf(context).height * 0.88;
+
+		return Padding(
+			padding: EdgeInsets.only(bottom: bottomInset),
+			child: Align(
+				alignment: Alignment.bottomCenter,
+				child: ConstrainedBox(
+					constraints: const BoxConstraints(maxWidth: 560),
+					child: SizedBox(
+						height: maxH,
+						child: Material(
+							color: AppTokens.whiteSurface,
+							borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+							clipBehavior: Clip.antiAlias,
+							elevation: 12,
+							shadowColor: Colors.black38,
+							child: Column(
+								crossAxisAlignment: CrossAxisAlignment.stretch,
+								children: [
+								const SizedBox(height: 10),
+								Center(
+									child: Container(
+										width: 40,
+										height: 4,
+										decoration: BoxDecoration(
+											color: Colors.grey.shade400,
+											borderRadius: BorderRadius.circular(2),
+										),
+									),
+								),
+								Padding(
+									padding: const EdgeInsets.fromLTRB(16, 14, 4, 4),
+									child: Row(
+										children: [
+											const Icon(Icons.add_box_outlined, color: Colors.black87, size: 26),
+											const SizedBox(width: 10),
+											const Expanded(
+												child: Text(
+													"AGREGAR STOCK",
+													style: TextStyle(
+														fontWeight: FontWeight.bold,
+														fontSize: 17,
+														letterSpacing: 0.4,
+														color: Colors.black87,
+													),
+												),
+											),
+											IconButton(
+												tooltip: "Cerrar",
+												onPressed: onClose,
+												icon: const Icon(Icons.close, color: Colors.black87),
+											),
+										],
+									),
+								),
+								Expanded(
+									child: SingleChildScrollView(
+										padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+										child: Center(
+											child: ConstrainedBox(
+												constraints: const BoxConstraints(maxWidth: 480),
+												child: AddStockFormPanel(
+													onSubmitSuccess: onClose,
+												),
+											),
+										),
+									),
+								),
+							],
+						),
+					),
+				),
+			),
+		),
 		);
 	}
 }
@@ -450,7 +1155,9 @@ class _EditarProductoStockDialogState extends State<_EditarProductoStockDialog> 
 		final p = widget.producto;
 		final codigoMostrado = p.codigo != null && p.codigo!.trim().isNotEmpty
 				? p.codigo!.trim()
-				: "STK-${(int.tryParse(p.id) ?? 0).toString().padLeft(3, "0")}";
+				: p.id.length >= 8
+						? p.id.substring(0, 8).toUpperCase()
+						: p.id.toUpperCase();
 
 		return AlertDialog(
 			title: const Text("Editar producto"),
@@ -548,6 +1255,7 @@ class _PanolToolbarBtn extends StatelessWidget {
 		required this.bg,
 		required this.fg,
 		this.onPressed,
+		this.stretch = false,
 	});
 
 	final String label;
@@ -555,14 +1263,16 @@ class _PanolToolbarBtn extends StatelessWidget {
 	final Color bg;
 	final Color fg;
 	final VoidCallback? onPressed;
+	final bool stretch;
 
 	@override
 	Widget build(BuildContext context) {
-		return FilledButton.icon(
+		final btn = FilledButton.icon(
 			style: FilledButton.styleFrom(
 				backgroundColor: bg,
 				foregroundColor: fg,
 				padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+				minimumSize: stretch ? const Size(double.infinity, 48) : null,
 				shape: RoundedRectangleBorder(
 					borderRadius: BorderRadius.circular(AppTokens.radiusMd),
 				),
@@ -576,6 +1286,10 @@ class _PanolToolbarBtn extends StatelessWidget {
 				style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
 			),
 		);
+		if (stretch) {
+			return SizedBox(width: double.infinity, child: btn);
+		}
+		return btn;
 	}
 }
 

@@ -15,6 +15,15 @@ import "../domain/maintenance_order.dart";
 	return (haySuficiente: ok, match: best, disponible: best.cantidad);
 }
 
+/// Comparación usando una línea de catálogo elegida por el supervisor (sin similitud de texto).
+({bool haySuficiente, StockProduct? match, int disponible}) analizarStockLineaExacta(
+	StockProduct linea,
+	int cantidadPedida,
+) {
+	final ok = linea.cantidad >= cantidadPedida;
+	return (haySuficiente: ok, match: linea, disponible: linea.cantidad);
+}
+
 /// Coincidencias entre el texto del pedido de mantenimiento y el catálogo de stock.
 ///
 /// Usa normalización, coincidencia por frase y por tokens (palabras ≥ 2 caracteres).

@@ -16,19 +16,49 @@ class MaintenanceOrdersRepository {
 		required String priority,
 		required String destination,
 	}) async {
+		await createOrderReturningId(
+			solicitanteDisplay: solicitanteDisplay,
+			productName: productName,
+			quantity: quantity,
+			productType: productType,
+			priority: priority,
+			destination: destination,
+		);
+	}
+
+	/// Inserta la OM y devuelve el `id` (para encadenar decisión del supervisor).
+	Future<String> createOrderReturningId({
+		required String solicitanteDisplay,
+		required String productName,
+		required int quantity,
+		required String productType,
+		required String priority,
+		required String destination,
+	}) async {
 		final uid = _client.auth.currentUser?.id;
 		if (uid == null) {
 			throw Exception("No hay sesión");
 		}
-		await _client.from("maintenance_orders").insert({
-			"created_by": uid,
-			"solicitante_display": solicitanteDisplay,
-			"product_name": productName,
-			"quantity": quantity,
-			"product_type": productType,
-			"priority": priority,
-			"destination": destination,
-		});
+		final row = await _client
+				.from("maintenance_orders")
+				.insert({
+					"created_by": uid,
+					"solicitante_display": solicitanteDisplay,
+					"product_name": productName,
+					"quantity": quantity,
+					"product_type": productType,
+					"priority": priority,
+					"destination": destination,
+				})
+				.select("id")
+				.single();
+		return row["id"] as String;
+	}
+
+	Future<MaintenanceOrder?> fetchOrderById(String id) async {
+		final row = await _client.from("maintenance_orders").select().eq("id", id).maybeSingle();
+		if (row == null) return null;
+		return MaintenanceOrder.fromJson(Map<String, dynamic>.from(row));
 	}
 
 	Future<List<MaintenanceOrder>> fetchSupervisorHistory() async {
@@ -38,6 +68,9 @@ class MaintenanceOrdersRepository {
 				.inFilter("workflow_status", [
 					"completed",
 					"forwarded_to_panol",
+					"panol_requested_compras",
+					"compras_oc_notified",
+					"compras_arrived_notified",
 					"cancelled",
 				])
 				.order("updated_at", ascending: false);
@@ -51,6 +84,7 @@ class MaintenanceOrdersRepository {
 				.inFilter("workflow_status", [
 					"pending_supervisor",
 					"supervisor_stock_ok",
+					"compras_arrived_notified",
 				])
 				.order("created_at", ascending: false);
 		return _mapList(rows);
@@ -60,7 +94,12 @@ class MaintenanceOrdersRepository {
 		final rows = await _client
 				.from("maintenance_orders")
 				.select()
-				.eq("workflow_status", "forwarded_to_panol")
+				.inFilter("workflow_status", [
+					"forwarded_to_panol",
+					"panol_requested_compras",
+					"compras_oc_notified",
+					"compras_arrived_notified",
+				])
 				.order("created_at", ascending: false);
 		return _mapList(rows);
 	}
@@ -86,23 +125,19 @@ class MaintenanceOrdersRepository {
 	Future<void> supervisorDecideStock({
 		required String orderId,
 		required bool hayStock,
-		String? note,
+		String? stockItemId,
 	}) async {
-		final uid = _client.auth.currentUser?.id;
-		if (uid == null) {
+		if (_client.auth.currentUser?.id == null) {
 			throw Exception("No hay sesión");
 		}
-		final next = hayStock ? "supervisor_stock_ok" : "forwarded_to_panol";
-		await _client
-				.from("maintenance_orders")
-				.update({
-					"workflow_status": next,
-					"supervisor_id": uid,
-					"supervisor_decided_at": DateTime.now().toUtc().toIso8601String(),
-					"supervisor_note": note,
-				})
-				.eq("id", orderId)
-				.eq("workflow_status", "pending_supervisor");
+		await _client.rpc<void>(
+			"supervisor_decide_stock_with_inventory",
+			params: <String, dynamic>{
+				"p_order_id": orderId,
+				"p_hay_stock": hayStock,
+				"p_stock_item_id": hayStock ? stockItemId : null,
+			},
+		);
 	}
 
 	Future<void> markCompleted(String orderId) async {
@@ -110,7 +145,16 @@ class MaintenanceOrdersRepository {
 				.from("maintenance_orders")
 				.update({"workflow_status": "completed"})
 				.eq("id", orderId)
-				.eq("workflow_status", "supervisor_stock_ok");
+				.inFilter("workflow_status", ["supervisor_stock_ok", "compras_arrived_notified"]);
+	}
+
+	/// Pañol: material ubicado fuera del catálogo digital; pasa a retiro (aviso vía trigger en BD).
+	Future<void> panolMarkExternalStockFound(String orderId) async {
+		await _client
+				.from("maintenance_orders")
+				.update({"workflow_status": "supervisor_stock_ok"})
+				.eq("id", orderId)
+				.eq("workflow_status", "forwarded_to_panol");
 	}
 
 	Future<void> insertOrderNotification({

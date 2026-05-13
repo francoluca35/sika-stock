@@ -159,9 +159,15 @@ class _MaintenanceNotificationsBlock extends ConsumerWidget {
 																		style: TextStyle(
 																			fontWeight: FontWeight.w800,
 																			fontSize: 13,
-																			color: n.kind == "stock_ok_retiro"
-																					? const Color(0xFF1B5E20)
-																					: Colors.orange.shade900,
+																			color: switch (n.kind) {
+																				"stock_ok_retiro" => const Color(0xFF1B5E20),
+																				"panol_stock_externo" => const Color(0xFF1B5E20),
+																				"oc_emitida_compras" =>
+																						Colors.indigo.shade900,
+																				"material_llego_planta" =>
+																						const Color(0xFF1B5E20),
+																				_ => Colors.orange.shade900,
+																			},
 																		),
 																	),
 																	const SizedBox(height: 4),

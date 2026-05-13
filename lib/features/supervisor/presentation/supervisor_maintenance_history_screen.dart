@@ -4,6 +4,7 @@ import "package:go_router/go_router.dart";
 import "package:intl/intl.dart";
 
 import "../../../core/theme/app_tokens.dart";
+import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../application/supervisor_maintenance_history_provider.dart";
 import "../domain/completed_maintenance_record.dart";
@@ -337,13 +338,35 @@ class _HistorialPedidoCard extends StatelessWidget {
 	static const Color _verdeBorde = Color(0xFF2E7D32);
 	static const Color _verdeTexto = Color(0xFF1B5E20);
 
+	static String _leyendaFlujo(MaintenanceWorkflowStatus ws, String fechaFmt) {
+		switch (ws) {
+			case MaintenanceWorkflowStatus.forwardedToPanol:
+				return "En consulta con pañol: $fechaFmt";
+			case MaintenanceWorkflowStatus.panolRequestedCompras:
+				return "Solicitud enviada a compras: $fechaFmt";
+			case MaintenanceWorkflowStatus.comprasOcNotified:
+				return "En consulta — OC emitida (Compras): $fechaFmt";
+			case MaintenanceWorkflowStatus.comprasArrivedNotified:
+				return "Material en planta: $fechaFmt";
+			default:
+				return "Última actualización: $fechaFmt";
+		}
+	}
+
 	@override
 	Widget build(BuildContext context) {
 		final o = record.pedido;
 		final ws = o.workflowStatus;
 
 		final bool esEntregado = ws == MaintenanceWorkflowStatus.completed;
-		final bool esConsultaPanol = ws == MaintenanceWorkflowStatus.forwardedToPanol;
+		final bool esFlujoConsultaCompras = switch (ws) {
+			MaintenanceWorkflowStatus.forwardedToPanol ||
+			MaintenanceWorkflowStatus.panolRequestedCompras ||
+			MaintenanceWorkflowStatus.comprasOcNotified ||
+			MaintenanceWorkflowStatus.comprasArrivedNotified =>
+				true,
+			_ => false,
+		};
 
 		final Color fondo;
 		final Color borde;
@@ -355,7 +378,7 @@ class _HistorialPedidoCard extends StatelessWidget {
 			borde = _verdeBorde;
 			tituloColor = _verdeTexto;
 			secundario = _verdeTexto.withValues(alpha: 0.85);
-		} else if (esConsultaPanol) {
+		} else if (esFlujoConsultaCompras) {
 			fondo = Colors.orange.shade50;
 			borde = Colors.orange.shade800;
 			tituloColor = Colors.orange.shade900;
@@ -367,11 +390,12 @@ class _HistorialPedidoCard extends StatelessWidget {
 			secundario = Colors.grey.shade800;
 		}
 
+		final fechaFmt = SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre);
 		final fechaLinea = esEntregado
-				? "Entregado: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre)}"
-				: esConsultaPanol
-						? "En consulta con pañol: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre)}"
-						: "Última actualización: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre)}";
+				? "Entregado: $fechaFmt"
+				: esFlujoConsultaCompras
+						? _HistorialPedidoCard._leyendaFlujo(ws, fechaFmt)
+						: "Última actualización: $fechaFmt";
 
 		return Material(
 			color: fondo,
@@ -379,9 +403,7 @@ class _HistorialPedidoCard extends StatelessWidget {
 			elevation: 0,
 			child: InkWell(
 				borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-				onTap: esConsultaPanol
-						? () => context.push("/panol/pedidos")
-						: null,
+				onTap: () => showMaintenanceOrderSeguimientoSheet(context, o),
 				child: Container(
 					padding: const EdgeInsets.all(14),
 					decoration: BoxDecoration(
@@ -409,7 +431,7 @@ class _HistorialPedidoCard extends StatelessWidget {
 										decoration: BoxDecoration(
 											color: esEntregado
 													? _verdeBorde
-													: esConsultaPanol
+													: esFlujoConsultaCompras
 															? Colors.orange.shade800
 															: Colors.grey.shade700,
 											borderRadius: BorderRadius.circular(6),
@@ -424,10 +446,10 @@ class _HistorialPedidoCard extends StatelessWidget {
 											),
 										),
 									),
-									if (esConsultaPanol) ...[
+									if (esFlujoConsultaCompras) ...[
 										const SizedBox(width: 8),
 										OutlinedButton.icon(
-											onPressed: () => context.push("/panol/pedidos"),
+											onPressed: () => showMaintenanceOrderSeguimientoSheet(context, o),
 											style: OutlinedButton.styleFrom(
 												foregroundColor: Colors.orange.shade900,
 												side: BorderSide(color: Colors.orange.shade800, width: 1.4),

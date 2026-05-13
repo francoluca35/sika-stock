@@ -52,11 +52,80 @@ class _SupervisorStockScreenState extends ConsumerState<SupervisorStockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final productos = ref.watch(supervisorStockCatalogProvider);
-    final filtrados = _filtrar(productos);
-    final categorias = _categoriasOrdenadas(productos);
+    final catalogAsync = ref.watch(supervisorStockCatalogProvider);
+    return catalogAsync.when(
+      loading: () => Scaffold(
+        backgroundColor: AppTokens.surfacePage,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            StockScreenHeader(
+              title: "STOCK DISPONIBLE",
+              onBack: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go("/home");
+                }
+              },
+            ),
+            const Expanded(
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          ],
+        ),
+      ),
+      error: (e, _) => Scaffold(
+        backgroundColor: AppTokens.surfacePage,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            StockScreenHeader(
+              title: "STOCK DISPONIBLE",
+              onBack: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go("/home");
+                }
+              },
+            ),
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "No se pudo cargar el stock.",
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "$e",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () =>
+                            ref.invalidate(supervisorStockCatalogProvider),
+                        child: const Text("Reintentar"),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      data: (productos) {
+        final filtrados = _filtrar(productos);
+        final categorias = _categoriasOrdenadas(productos);
 
-    return Scaffold(
+        return Scaffold(
       backgroundColor: AppTokens.surfacePage,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -210,6 +279,8 @@ class _SupervisorStockScreenState extends ConsumerState<SupervisorStockScreen> {
           ),
         ],
       ),
+    );
+      },
     );
   }
 }
