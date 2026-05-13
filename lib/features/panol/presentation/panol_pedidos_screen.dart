@@ -6,6 +6,7 @@ import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../application/panol_forwarded_orders_provider.dart";
+import "../application/panol_order_history_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
@@ -15,9 +16,10 @@ import "../../compras/application/compras_panol_stock_requests_provider.dart";
 import "../../compras/application/compras_stock_repository_provider.dart";
 import "../../orders/application/mantenimiento_notificaciones_provider.dart";
 import "../../orders/application/mis_pedidos_mantenimiento_provider.dart";
-import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
+import "../../orders/presentation/widgets/maintenance_order_detail_dialog.dart";
 import "../../supervisor/application/maintenance_orders_provider.dart";
 import "../../supervisor/application/supervisor_maintenance_history_provider.dart";
+import "widgets/panol_agregar_stock_dialog.dart";
 
 bool _panolPedidosLayoutCompact(BuildContext context) =>
 		MediaQuery.sizeOf(context).width < 720;
@@ -32,6 +34,8 @@ _EstadoPedidoPanol _panolBadgeDesdeWorkflow(MaintenanceWorkflowStatus w) {
 			return _EstadoPedidoPanol.consultaMantenimiento;
 		case MaintenanceWorkflowStatus.comprasArrivedNotified:
 			return _EstadoPedidoPanol.materialEnPlanta;
+		case MaintenanceWorkflowStatus.supervisorStockOk:
+			return _EstadoPedidoPanol.listoParaRetiro;
 		default:
 			return _EstadoPedidoPanol.consultaMantenimiento;
 	}
@@ -60,6 +64,7 @@ enum _EstadoPedidoPanol {
 	consultaMantenimiento,
 	enTramiteCompras,
 	materialEnPlanta,
+	listoParaRetiro,
 }
 
 /// Pantalla **Pedidos** Pañol.
@@ -100,6 +105,22 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 			if (nombreStock.contains(t)) return true;
 		}
 		return false;
+	}
+
+	StockProduct? _buscarStockMatch({
+		required String pedidoProducto,
+		required List<StockProduct> stocks,
+	}) {
+		final pedido = pedidoProducto.split(RegExp(r"[\r\n]+")).first.trim();
+		StockProduct? mejor;
+		for (final p in stocks) {
+			if (!_productoCoincideConStock(pedidoProducto: pedido, stockProducto: p)) {
+				continue;
+			}
+			mejor ??= p;
+			if (p.cantidad > mejor.cantidad) mejor = p;
+		}
+		return mejor;
 	}
 
 	int _calcularCantidadStock(
@@ -257,16 +278,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			),
 																		),
 																		TextButton.icon(
-																			onPressed: () {
-																				ScaffoldMessenger.of(context)
-																						.showSnackBar(
-																					const SnackBar(
-																						content: Text(
-																							"Historial de pedidos — próximamente.",
-																						),
-																					),
-																				);
-																			},
+																			onPressed: () => context.push("/panol/pedidos-historial"),
 																			icon: const Icon(Icons.history_outlined,
 																					size: 18),
 																			label: const Text(
@@ -303,51 +315,55 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																	final esConsulta = idx < consultasCount;
 																	final cantidadStock =
 																			_calcularCantidadStock(o, stocks);
-																	final tieneStock = cantidadStock > 0;
 																	final compact =
 																			_panolPedidosLayoutCompact(context);
 																	final MaintenanceOrder? moRow =
 																			esConsulta ? consultas[idx] : null;
-																	final dosBotonesPanolSinCatalogo =
+																	final tresBotonesPanolPendiente =
 																			moRow != null &&
-																					!tieneStock &&
 																					moRow.workflowStatus ==
 																							MaintenanceWorkflowStatus
 																									.forwardedToPanol;
+																	final listoParaRetiro =
+																			moRow != null &&
+																					(moRow.workflowStatus ==
+																							MaintenanceWorkflowStatus
+																									.supervisorStockOk ||
+																						moRow.workflowStatus ==
+																								MaintenanceWorkflowStatus
+																										.comprasArrivedNotified);
 
 																	void onVer() {
 																		if (esConsulta) {
 																			final mo = consultas[idx];
-																			ScaffoldMessenger.of(context).showSnackBar(
-																				SnackBar(
-																					content: Text(
-																						"${mo.numeroOrden}\n${mo.motivo}\nDestino: ${mo.destination}",
-																					),
-																				),
+																			showMaintenanceOrderDetalleDialog(
+																				context,
+																				mo,
+																				stockCatalogoCantidad: cantidadStock,
 																			);
 																			return;
 																		}
-																		ScaffoldMessenger.of(context).showSnackBar(
-																			SnackBar(
+																		showDialog<void>(
+																			context: context,
+																			builder: (ctx) => AlertDialog(
+																				title: const Text("Detalle del pedido"),
 																				content: Text(
-																					"Pedido ${o.numero}: ${o.producto} · ${o.estado.name.toUpperCase()}",
+																					"Pedido ${o.numero}\n"
+																					"Fecha: ${_fmtFecha(o.fecha)}\n"
+																					"Producto: ${o.producto}\n"
+																					"Estado: ${o.estado.name}",
 																				),
+																				actions: [
+																					TextButton(
+																						onPressed: () => Navigator.pop(ctx),
+																						child: const Text("Cerrar"),
+																					),
+																				],
 																			),
 																		);
 																	}
 
 																	Future<void> onTercero() async {
-																		if (tieneStock) {
-																			if (!context.mounted) return;
-																			ScaffoldMessenger.of(context).showSnackBar(
-																				SnackBar(
-																					content: Text(
-																						"Retirar pedido ${o.numero} (stock OK).",
-																					),
-																				),
-																			);
-																			return;
-																		}
 																		if (!esConsulta) {
 																			if (!context.mounted) return;
 																			ScaffoldMessenger.of(context).showSnackBar(
@@ -361,6 +377,18 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			return;
 																		}
 																		final mo = consultas[idx];
+																		if (mo.workflowStatus !=
+																				MaintenanceWorkflowStatus.forwardedToPanol) {
+																			if (!context.mounted) return;
+																			ScaffoldMessenger.of(context).showSnackBar(
+																				const SnackBar(
+																					content: Text(
+																						"Este pedido ya fue enviado a compras o está en otro estado.",
+																					),
+																				),
+																			);
+																			return;
+																		}
 																		try {
 																			await ref
 																					.read(comprasStockRepositoryProvider)
@@ -401,7 +429,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																		}
 																	}
 
-																	Future<void> onEncontreStock() async {
+																	Future<void> onAgregarStock() async {
 																		if (!esConsulta || !context.mounted) return;
 																		final mo = consultas[idx];
 																		if (mo.workflowStatus !=
@@ -409,23 +437,43 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																						.forwardedToPanol) {
 																			return;
 																		}
+																		final nombrePedido = mo.producto.trim();
+																		final match = _buscarStockMatch(
+																			pedidoProducto: nombrePedido,
+																			stocks: stocks,
+																		);
+																		final dialogResult =
+																				await showPanolAgregarStockDialog(
+																			context: context,
+																			order: mo,
+																			matchedProduct: match,
+																		);
+																		if (dialogResult == null || !context.mounted) {
+																			return;
+																		}
 																		try {
 																			await ref
 																					.read(
 																						maintenanceOrdersRepositoryProvider,
 																					)
-																					.panolMarkExternalStockFound(mo.id);
+																					.panolConfirmCatalogStock(
+																						orderId: mo.id,
+																						stockItemId:
+																								dialogResult.stockItemId,
+																						cantidad: dialogResult.cantidad,
+																					);
 																			ref.invalidate(panolForwardedOrdersProvider);
 																			ref.invalidate(maintenanceOrdersProvider);
 																			ref.invalidate(misPedidosMantenimientoProvider);
 																			ref.invalidate(mantenimientoNotificacionesProvider);
 																			ref.invalidate(supervisorMaintenanceHistoryProvider);
+																			ref.invalidate(supervisorStockCatalogProvider);
 																			if (!context.mounted) return;
 																			ScaffoldMessenger.of(context).showSnackBar(
 																				SnackBar(
 																					content: Text(
-																						"Listo para retiro: ${mo.numeroOrden} · ${mo.producto} "
-																						"(fuera del inventario digital).",
+																						"Stock registrado · listo para retiro: "
+																						"${mo.numeroOrden} · ${mo.producto}",
 																					),
 																				),
 																			);
@@ -434,15 +482,66 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			ScaffoldMessenger.of(context).showSnackBar(
 																				SnackBar(
 																					content: Text(
-																						"No se pudo registrar el hallazgo: $e",
+																						"No se pudo registrar el stock: $e",
 																					),
 																				),
 																			);
 																		}
 																	}
 
-																	void onEncontreStockSync() {
-																		unawaited(onEncontreStock());
+																	void onAgregarStockSync() {
+																		unawaited(onAgregarStock());
+																	}
+
+																	Future<void> onRetiro() async {
+																		if (!esConsulta || !context.mounted) return;
+																		final mo = consultas[idx];
+																		if (mo.workflowStatus !=
+																				MaintenanceWorkflowStatus
+																						.supervisorStockOk &&
+																			mo.workflowStatus !=
+																					MaintenanceWorkflowStatus
+																							.comprasArrivedNotified) {
+																			return;
+																		}
+																		try {
+																			await ref
+																					.read(
+																						maintenanceOrdersRepositoryProvider,
+																					)
+																					.markCompleted(mo.id);
+																			ref.invalidate(panolForwardedOrdersProvider);
+																			ref.invalidate(panolOrderHistoryProvider);
+																			ref.invalidate(maintenanceOrdersProvider);
+																			ref.invalidate(supervisorMaintenanceHistoryProvider);
+																			ref.invalidate(supervisorStockCatalogProvider);
+																			if (!context.mounted) return;
+																			final desconto = mo.stockItemId != null &&
+																					mo.stockItemId!.isNotEmpty;
+																			ScaffoldMessenger.of(context).showSnackBar(
+																				SnackBar(
+																					content: Text(
+																						desconto
+																								? "Retiro registrado: ${mo.numeroOrden} · "
+																										"se descontaron ${mo.quantity} u. del inventario."
+																								: "Retiro registrado: ${mo.numeroOrden}.",
+																					),
+																				),
+																			);
+																		} catch (e) {
+																			if (!context.mounted) return;
+																			ScaffoldMessenger.of(context).showSnackBar(
+																				SnackBar(
+																					content: Text(
+																						"No se pudo registrar el retiro: $e",
+																					),
+																				),
+																			);
+																		}
+																	}
+
+																	void onRetiroSync() {
+																		unawaited(onRetiro());
 																	}
 
 																	void onTerceroSync() {
@@ -451,9 +550,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 
 																	void onSeguimiento() {
 																		if (!context.mounted) return;
-																		final mo = moRow;
-																		if (mo == null) return;
-																		showMaintenanceOrderSeguimientoSheet(context, mo);
+																		context.push("/panol/seguimiento");
 																	}
 
 																	if (compact) {
@@ -465,10 +562,12 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			onTercero: onTerceroSync,
 																			workflowMo: moRow?.workflowStatus,
 																			onSeguimiento: moRow == null ? null : onSeguimiento,
-																			dosBotonesPanolSinCatalogo: dosBotonesPanolSinCatalogo,
-																			onEncontreStock: dosBotonesPanolSinCatalogo
-																					? onEncontreStockSync
+																			tresBotonesPanolPendiente: tresBotonesPanolPendiente,
+																			onAgregarStock: tresBotonesPanolPendiente
+																					? onAgregarStockSync
 																					: null,
+																			listoParaRetiro: listoParaRetiro,
+																			onRetiro: listoParaRetiro ? onRetiroSync : null,
 																		);
 																	}
 
@@ -532,11 +631,14 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																						workflowMo: moRow?.workflowStatus,
 																						onSeguimiento:
 																								moRow == null ? null : onSeguimiento,
-																						dosBotonesPanolSinCatalogo:
-																								dosBotonesPanolSinCatalogo,
-																						onEncontreStock: dosBotonesPanolSinCatalogo
-																								? onEncontreStockSync
+																						tresBotonesPanolPendiente:
+																								tresBotonesPanolPendiente,
+																						onAgregarStock: tresBotonesPanolPendiente
+																								? onAgregarStockSync
 																								: null,
+																						listoParaRetiro: listoParaRetiro,
+																						onRetiro:
+																								listoParaRetiro ? onRetiroSync : null,
 																					),
 																				),
 																			],
@@ -572,8 +674,10 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 		required this.onTercero,
 		this.workflowMo,
 		this.onSeguimiento,
-		this.dosBotonesPanolSinCatalogo = false,
-		this.onEncontreStock,
+		this.tresBotonesPanolPendiente = false,
+		this.onAgregarStock,
+		this.listoParaRetiro = false,
+		this.onRetiro,
 	});
 
 	final _PanolPedidoDemo pedido;
@@ -583,8 +687,10 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 	final VoidCallback onTercero;
 	final MaintenanceWorkflowStatus? workflowMo;
 	final VoidCallback? onSeguimiento;
-	final bool dosBotonesPanolSinCatalogo;
-	final VoidCallback? onEncontreStock;
+	final bool tresBotonesPanolPendiente;
+	final VoidCallback? onAgregarStock;
+	final bool listoParaRetiro;
+	final VoidCallback? onRetiro;
 
 	@override
 	Widget build(BuildContext context) {
@@ -650,8 +756,10 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 								onTercero: onTercero,
 								workflowMo: workflowMo,
 								onSeguimiento: onSeguimiento,
-								dosBotonesPanolSinCatalogo: dosBotonesPanolSinCatalogo,
-								onEncontreStock: onEncontreStock,
+								tresBotonesPanolPendiente: tresBotonesPanolPendiente,
+								onAgregarStock: onAgregarStock,
+								listoParaRetiro: listoParaRetiro,
+								onRetiro: onRetiro,
 							),
 						],
 					),
@@ -702,8 +810,10 @@ class _PanolPedidosActions extends StatelessWidget {
 		required this.onTercero,
 		this.workflowMo,
 		this.onSeguimiento,
-		this.dosBotonesPanolSinCatalogo = false,
-		this.onEncontreStock,
+		this.tresBotonesPanolPendiente = false,
+		this.onAgregarStock,
+		this.listoParaRetiro = false,
+		this.onRetiro,
 	});
 
 	final bool compact;
@@ -712,8 +822,10 @@ class _PanolPedidosActions extends StatelessWidget {
 	final VoidCallback onTercero;
 	final MaintenanceWorkflowStatus? workflowMo;
 	final VoidCallback? onSeguimiento;
-	final bool dosBotonesPanolSinCatalogo;
-	final VoidCallback? onEncontreStock;
+	final bool tresBotonesPanolPendiente;
+	final VoidCallback? onAgregarStock;
+	final bool listoParaRetiro;
+	final VoidCallback? onRetiro;
 
 	@override
 	Widget build(BuildContext context) {
@@ -733,7 +845,10 @@ class _PanolPedidosActions extends StatelessWidget {
 		final mostrarSeguimientoExtra =
 				onSeguimiento != null && !seguimientoCompras;
 
-		if (dosBotonesPanolSinCatalogo && onEncontreStock != null) {
+		if (listoParaRetiro && onRetiro != null) {
+			final retiroLabel = wf == MaintenanceWorkflowStatus.comprasArrivedNotified
+					? "COMPLETAR"
+					: "RETIRAR";
 			if (compact) {
 				return Column(
 					crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -752,69 +867,123 @@ class _PanolPedidosActions extends StatelessWidget {
 							),
 						),
 						const SizedBox(height: 10),
-						Row(
-							children: [
-								Expanded(
-									child: FilledButton.icon(
-										onPressed: onEncontreStock,
-										icon: const Icon(Icons.check_circle_outline, size: 22),
-										label: const Text(
-											"ENCONTRÉ STOCK",
-											style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-											textAlign: TextAlign.center,
-										),
-										style: FilledButton.styleFrom(
-											backgroundColor: AppTokens.statusOk,
-											foregroundColor: Colors.white,
-											padding: const EdgeInsets.symmetric(vertical: 14),
-											shape: RoundedRectangleBorder(
-												borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-											),
-										),
-									),
-								),
-								const SizedBox(width: 10),
-								Expanded(
-									child: FilledButton.icon(
-										onPressed: onTercero,
-										icon: const Icon(Icons.shopping_cart_outlined, size: 22),
-										label: const Text(
-											"PEDIR A COMPRAS",
-											style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-											textAlign: TextAlign.center,
-										),
-										style: FilledButton.styleFrom(
-											backgroundColor: AppTokens.redAction,
-											foregroundColor: Colors.white,
-											padding: const EdgeInsets.symmetric(vertical: 14),
-											shape: RoundedRectangleBorder(
-												borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-											),
-										),
-									),
-								),
-							],
-						),
-					if (mostrarSeguimientoExtra) ...[
-						const SizedBox(height: 10),
-						OutlinedButton.icon(
-							onPressed: onSeguimiento!,
-							icon: Icon(Icons.timeline_outlined, size: 20, color: Colors.indigo.shade800),
+						FilledButton.icon(
+							onPressed: onRetiro,
+							icon: const Icon(Icons.download_done_outlined, size: 22),
 							label: Text(
-								"SEGUIMIENTO",
-								style: TextStyle(
-									fontWeight: FontWeight.w800,
-									fontSize: 13,
-									color: Colors.indigo.shade900,
-								),
+								retiroLabel,
+								style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
 							),
-							style: OutlinedButton.styleFrom(
-								foregroundColor: Colors.indigo.shade900,
-								side: BorderSide(color: Colors.indigo.shade700, width: 1.2),
-								padding: const EdgeInsets.symmetric(vertical: 12),
+							style: FilledButton.styleFrom(
+								backgroundColor: AppTokens.redAction,
+								foregroundColor: Colors.white,
+								padding: const EdgeInsets.symmetric(vertical: 14),
+								shape: RoundedRectangleBorder(
+									borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+								),
 							),
 						),
 					],
+				);
+			}
+			return Row(
+				children: [
+					Expanded(
+						child: OutlinedButton.icon(
+							onPressed: onVer,
+							icon: const Icon(Icons.visibility_outlined, size: 18),
+							label: const Text(
+								"VER",
+								style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+							),
+							style: OutlinedButton.styleFrom(
+								padding: EdgeInsets.zero,
+								foregroundColor: Colors.black87,
+								side: BorderSide(color: AppTokens.greyBorder),
+								minimumSize: const Size(0, 40),
+							),
+						),
+					),
+					const SizedBox(width: 8),
+					Expanded(
+						flex: 2,
+						child: FilledButton.icon(
+							onPressed: onRetiro,
+							icon: const Icon(Icons.download_done_outlined, size: 18),
+							label: Text(
+								retiroLabel,
+								textAlign: TextAlign.center,
+								style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+							),
+							style: FilledButton.styleFrom(
+								padding: EdgeInsets.zero,
+								backgroundColor: AppTokens.redAction,
+								foregroundColor: Colors.white,
+								shape: RoundedRectangleBorder(
+									borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+								),
+								minimumSize: const Size(0, 40),
+							),
+						),
+					),
+				],
+			);
+		}
+
+		if (tresBotonesPanolPendiente && onAgregarStock != null) {
+			if (compact) {
+				return Column(
+					crossAxisAlignment: CrossAxisAlignment.stretch,
+					children: [
+						OutlinedButton.icon(
+							onPressed: onVer,
+							icon: const Icon(Icons.visibility_outlined, size: 20),
+							label: const Text(
+								"VER",
+								style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+							),
+							style: OutlinedButton.styleFrom(
+								foregroundColor: Colors.black87,
+								side: BorderSide(color: AppTokens.greyBorder),
+								padding: const EdgeInsets.symmetric(vertical: 12),
+							),
+						),
+						const SizedBox(height: 10),
+						FilledButton.icon(
+							onPressed: onAgregarStock,
+							icon: const Icon(Icons.add_box_outlined, size: 22),
+							label: const Text(
+								"AGREGAR NUEVO STOCK",
+								style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+								textAlign: TextAlign.center,
+							),
+							style: FilledButton.styleFrom(
+								backgroundColor: AppTokens.statusOk,
+								foregroundColor: Colors.white,
+								padding: const EdgeInsets.symmetric(vertical: 14),
+								shape: RoundedRectangleBorder(
+									borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+								),
+							),
+						),
+						const SizedBox(height: 10),
+						FilledButton.icon(
+							onPressed: onTercero,
+							icon: const Icon(Icons.shopping_cart_outlined, size: 22),
+							label: const Text(
+								"PEDIR A COMPRAS",
+								style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+								textAlign: TextAlign.center,
+							),
+							style: FilledButton.styleFrom(
+								backgroundColor: AppTokens.redAction,
+								foregroundColor: Colors.white,
+								padding: const EdgeInsets.symmetric(vertical: 14),
+								shape: RoundedRectangleBorder(
+									borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+								),
+							),
+						),
 					],
 				);
 			}
@@ -840,77 +1009,52 @@ class _PanolPedidosActions extends StatelessWidget {
 									),
 								),
 							),
-							const SizedBox(width: 8),
+							const SizedBox(width: 6),
 							Expanded(
 								flex: 2,
-								child: Row(
-									children: [
-										Expanded(
-											child: FilledButton.icon(
-												onPressed: onEncontreStock,
-												icon: const Icon(Icons.check_circle_outline, size: 18),
-												label: const Text(
-													"ENCONTRÉ\nSTOCK",
-													textAlign: TextAlign.center,
-													style: TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
-												),
-												style: FilledButton.styleFrom(
-													padding: EdgeInsets.zero,
-													backgroundColor: AppTokens.statusOk,
-													foregroundColor: Colors.white,
-													shape: RoundedRectangleBorder(
-														borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-													),
-													minimumSize: const Size(0, 40),
-												),
-											),
+								child: FilledButton.icon(
+									onPressed: onAgregarStock,
+									icon: const Icon(Icons.add_box_outlined, size: 18),
+									label: const Text(
+										"AGREGAR\nSTOCK",
+										textAlign: TextAlign.center,
+										style: TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
+									),
+									style: FilledButton.styleFrom(
+										padding: EdgeInsets.zero,
+										backgroundColor: AppTokens.statusOk,
+										foregroundColor: Colors.white,
+										shape: RoundedRectangleBorder(
+											borderRadius: BorderRadius.circular(AppTokens.radiusMd),
 										),
-										const SizedBox(width: 6),
-										Expanded(
-											child: FilledButton.icon(
-												onPressed: onTercero,
-												icon: const Icon(Icons.shopping_cart_outlined, size: 18),
-												label: const Text(
-													"PEDIR A\nCOMPRAS",
-													textAlign: TextAlign.center,
-													style: TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
-												),
-												style: FilledButton.styleFrom(
-													padding: EdgeInsets.zero,
-													backgroundColor: AppTokens.redAction,
-													foregroundColor: Colors.white,
-													shape: RoundedRectangleBorder(
-														borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-													),
-													minimumSize: const Size(0, 40),
-												),
-											),
+										minimumSize: const Size(0, 40),
+									),
+								),
+							),
+							const SizedBox(width: 6),
+							Expanded(
+								flex: 2,
+								child: FilledButton.icon(
+									onPressed: onTercero,
+									icon: const Icon(Icons.shopping_cart_outlined, size: 18),
+									label: const Text(
+										"PEDIR A\nCOMPRAS",
+										textAlign: TextAlign.center,
+										style: TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
+									),
+									style: FilledButton.styleFrom(
+										padding: EdgeInsets.zero,
+										backgroundColor: AppTokens.redAction,
+										foregroundColor: Colors.white,
+										shape: RoundedRectangleBorder(
+											borderRadius: BorderRadius.circular(AppTokens.radiusMd),
 										),
-									],
+										minimumSize: const Size(0, 40),
+									),
 								),
 							),
 						],
 					),
-					if (mostrarSeguimientoExtra) ...[
-						const SizedBox(height: 8),
-						OutlinedButton.icon(
-							onPressed: onSeguimiento!,
-							icon: Icon(Icons.timeline_outlined, size: 18, color: Colors.indigo.shade800),
-							label: Text(
-								"SEGUIMIENTO",
-								style: TextStyle(
-									fontWeight: FontWeight.w800,
-									fontSize: 12,
-									color: Colors.indigo.shade900,
-								),
-							),
-							style: OutlinedButton.styleFrom(
-								foregroundColor: Colors.indigo.shade900,
-								side: BorderSide(color: Colors.indigo.shade700, width: 1.2),
-								padding: const EdgeInsets.symmetric(vertical: 10),
-							),
-						),
-					],
 				],
 			);
 		}
@@ -1165,6 +1309,8 @@ class _PedidoBadge extends StatelessWidget {
 				return _chip("EN COMPRAS", Colors.amber.shade800, Colors.black87);
 			case _EstadoPedidoPanol.materialEnPlanta:
 				return _chip("EN PLANTA", AppTokens.statusOk, Colors.white);
+			case _EstadoPedidoPanol.listoParaRetiro:
+				return _chip("LISTO RETIRO", AppTokens.statusOk, Colors.white);
 			case _EstadoPedidoPanol.completado:
 				return _chip("COMPLETADO", AppTokens.statusOk, Colors.white);
 		}

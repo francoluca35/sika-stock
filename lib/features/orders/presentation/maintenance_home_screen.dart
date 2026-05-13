@@ -4,9 +4,8 @@ import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
-import "../../supervisor/application/maintenance_orders_provider.dart";
 import "../../supervisor/application/maintenance_orders_realtime_provider.dart";
-import "../application/mantenimiento_notificaciones_provider.dart";
+import "widgets/maintenance_notifications_block.dart";
 import "widgets/order_hub_bottom_bar.dart";
 
 /// Inicio del rol **Mantenimiento**: hacer pedido e historial de pedidos (sin hub de gestión de stock).
@@ -44,7 +43,7 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 									child: Column(
 										crossAxisAlignment: CrossAxisAlignment.stretch,
 										children: [
-											const _MaintenanceNotificationsBlock(),
+											const MaintenanceNotificationsBlock(),
 											const SizedBox(height: 8),
 											Text(
 												"Pedidos de mantenimiento",
@@ -98,112 +97,6 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 					),
 				],
 			),
-		);
-	}
-}
-
-class _MaintenanceNotificationsBlock extends ConsumerWidget {
-	const _MaintenanceNotificationsBlock();
-
-	@override
-	Widget build(BuildContext context, WidgetRef ref) {
-		final async = ref.watch(mantenimientoNotificacionesProvider);
-		return async.when(
-			data: (list) {
-				if (list.isEmpty) return const SizedBox.shrink();
-				return Material(
-					color: const Color(0xFFE3F2FD),
-					borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-					elevation: 0,
-					child: Container(
-						decoration: BoxDecoration(
-							borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-							border: Border.all(color: Colors.blue.shade200),
-						),
-						padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-						child: Column(
-							crossAxisAlignment: CrossAxisAlignment.stretch,
-							children: [
-								Row(
-									children: [
-										Icon(Icons.notifications_active_outlined, size: 20, color: Colors.blue.shade900),
-										const SizedBox(width: 8),
-										Text(
-											"Avisos",
-											style: TextStyle(
-												fontWeight: FontWeight.bold,
-												fontSize: 14,
-												color: Colors.blue.shade900,
-											),
-										),
-									],
-								),
-								const SizedBox(height: 8),
-								for (final n in list.take(8))
-									Padding(
-										padding: const EdgeInsets.only(bottom: 8),
-										child: Material(
-											color: AppTokens.whiteSurface,
-											borderRadius: BorderRadius.circular(8),
-											child: Padding(
-												padding: const EdgeInsets.fromLTRB(10, 8, 6, 8),
-												child: Row(
-													crossAxisAlignment: CrossAxisAlignment.start,
-													children: [
-														Expanded(
-															child: Column(
-																crossAxisAlignment: CrossAxisAlignment.start,
-																children: [
-																	Text(
-																		n.title,
-																		style: TextStyle(
-																			fontWeight: FontWeight.w800,
-																			fontSize: 13,
-																			color: switch (n.kind) {
-																				"stock_ok_retiro" => const Color(0xFF1B5E20),
-																				"panol_stock_externo" => const Color(0xFF1B5E20),
-																				"oc_emitida_compras" =>
-																						Colors.indigo.shade900,
-																				"material_llego_planta" =>
-																						const Color(0xFF1B5E20),
-																				_ => Colors.orange.shade900,
-																			},
-																		),
-																	),
-																	const SizedBox(height: 4),
-																	Text(
-																		n.body,
-																		style: TextStyle(
-																			fontSize: 12.5,
-																			height: 1.25,
-																			color: Colors.grey.shade800,
-																		),
-																	),
-																],
-															),
-														),
-														if (n.isUnread)
-															TextButton(
-																onPressed: () async {
-																	await ref
-																			.read(maintenanceOrdersRepositoryProvider)
-																			.markNotificationRead(n.id);
-																	ref.invalidate(mantenimientoNotificacionesProvider);
-																},
-																child: const Text("OK"),
-															),
-													],
-												),
-											),
-										),
-									),
-							],
-						),
-					),
-				);
-			},
-			loading: () => const SizedBox.shrink(),
-			error: (_, __) => const SizedBox.shrink(),
 		);
 	}
 }

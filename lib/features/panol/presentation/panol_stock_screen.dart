@@ -8,13 +8,18 @@ import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
 import "../../auth/domain/profile_row.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
+import "../../stock/presentation/widgets/stock_excel_import_dialog.dart";
 import "../../stock/domain/stock_product.dart";
+import "../../stock/domain/stock_alert_level.dart";
 import "../../stock/presentation/widgets/add_stock_form_panel.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 
 /// Ancho por debajo del cual el stock Pañol usa layout compacto (escritorio ≥720px sin cambios).
 bool _panolStockLayoutCompact(BuildContext context) =>
 		MediaQuery.sizeOf(context).width < 720;
+
+/// Ancho mínimo de la tabla desktop (evita que DataTable comprima columnas).
+const double _kPanolStockTableWidth = 1480;
 
 /// Orden / filtro de la lista de stock (pantalla Pañol).
 enum _PanolStockFilterSort {
@@ -42,6 +47,13 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 
 	_PanolStockFilterSort _filtroOrden = _PanolStockFilterSort.catalogo;
 	String _busqueda = "";
+	String? _categoriaFiltro;
+
+	List<StockProduct>? _visiblesCache;
+	List<StockProduct>? _visiblesCacheSource;
+	String _visiblesCacheBusqueda = "";
+	_PanolStockFilterSort _visiblesCacheOrden = _PanolStockFilterSort.catalogo;
+	String? _visiblesCacheCategoria;
 
 	void _setModoEdicion(bool activo) {
 		setState(() {
@@ -83,6 +95,16 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 		);
 	}
 
+	Future<void> _cargarExcel() async {
+		setState(() {
+			_modoEdicion = false;
+			_modoEliminar = false;
+			_idsSeleccionados.clear();
+		});
+		if (!mounted) return;
+		await showStockExcelImportDialog(context, ref);
+	}
+
 	void _toggleSeleccionFila(String id, bool? seleccionado) {
 		setState(() {
 			if (seleccionado == true) {
@@ -101,12 +123,69 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 		return "STK-${n.toString().padLeft(3, "0")}";
 	}
 
-	bool _bajoStock(StockProduct p) => p.cantidad == 0 || p.cantidad < 15;
+	String _textoLista(String v) {
+		final t = v.trim();
+		return t.isEmpty ? "—" : t;
+	}
+
+	Widget _detalleListaLinea(String etiqueta, String valor) {
+		return Padding(
+			padding: const EdgeInsets.only(top: 4),
+			child: Text(
+				"$etiqueta · ${_textoLista(valor)}",
+				style: TextStyle(
+					fontSize: 13,
+					height: 1.3,
+					color: Colors.grey.shade700,
+				),
+				maxLines: 4,
+				overflow: TextOverflow.ellipsis,
+			),
+		);
+	}
+
+	Widget _celdaLista(String texto, {double minWidth = 132, double maxWidth = 220}) {
+		final t = _textoLista(texto);
+		return ConstrainedBox(
+			constraints: BoxConstraints(minWidth: minWidth, maxWidth: maxWidth),
+			child: Tooltip(
+				message: t == "—" ? "" : t,
+				child: Text(
+					t,
+					maxLines: 3,
+					overflow: TextOverflow.ellipsis,
+					softWrap: true,
+				),
+			),
+		);
+	}
+
+	void _onTapEditarFila(StockProduct p, bool puedeGestionar) {
+		if (puedeGestionar && _modoEdicion && !_modoEliminar) {
+			_abrirModalEdicion(p);
+		}
+	}
 
 	bool get _hayFiltrosActivos =>
-			_busqueda.trim().isNotEmpty || _filtroOrden != _PanolStockFilterSort.catalogo;
+			_busqueda.trim().isNotEmpty ||
+			_filtroOrden != _PanolStockFilterSort.catalogo ||
+			_categoriaFiltro != null;
+
+	List<String> _categoriasOrdenadas(List<StockProduct> productos) {
+		final s = productos.map((p) => p.categoria).toSet().toList();
+		s.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+		return s;
+	}
 
 	List<StockProduct> _productosVisibles(List<StockProduct> todos) {
+		if (_visiblesCache != null &&
+				identical(_visiblesCacheSource, todos) &&
+				_visiblesCacheBusqueda == _busqueda &&
+				_visiblesCacheOrden == _filtroOrden &&
+				_visiblesCacheCategoria == _categoriaFiltro) {
+			return _visiblesCache!;
+		}
+
 		final q = _busqueda.trim().toLowerCase();
 		var list = List<StockProduct>.from(todos);
 		if (q.isNotEmpty) {
@@ -114,8 +193,14 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 				final cod = _codigoStock(p).toLowerCase();
 				return p.nombre.toLowerCase().contains(q) ||
 						p.categoria.toLowerCase().contains(q) ||
+						p.marca.toLowerCase().contains(q) ||
+						p.descripcionEmpresa.toLowerCase().contains(q) ||
+						p.descripcionFabricante.toLowerCase().contains(q) ||
 						cod.contains(q);
 			}).toList();
+		}
+		if (_categoriaFiltro != null) {
+			list = list.where((p) => p.categoria == _categoriaFiltro).toList();
 		}
 		if (_filtroOrden == _PanolStockFilterSort.soloSinStock) {
 			list = list.where((p) => p.cantidad == 0).toList();
@@ -142,11 +227,17 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 				list.sort((a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
 				break;
 		}
+		_visiblesCacheSource = todos;
+		_visiblesCacheBusqueda = _busqueda;
+		_visiblesCacheOrden = _filtroOrden;
+		_visiblesCacheCategoria = _categoriaFiltro;
+		_visiblesCache = list;
 		return list;
 	}
 
-	Future<void> _abrirBottomSheetFiltros() async {
-		final result = await showModalBottomSheet<({String q, _PanolStockFilterSort orden})>(
+	Future<void> _abrirBottomSheetFiltros(List<StockProduct> productos) async {
+		final result = await showModalBottomSheet<
+				({String q, _PanolStockFilterSort orden, String? categoria})>(
 			context: context,
 			isScrollControlled: true,
 			useSafeArea: true,
@@ -154,12 +245,15 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 			builder: (ctx) => _PanolFiltrosStockBottomSheet(
 				busquedaInicial: _busqueda,
 				ordenInicial: _filtroOrden,
+				categoriaInicial: _categoriaFiltro,
+				categorias: _categoriasOrdenadas(productos),
 			),
 		);
 		if (!mounted || result == null) return;
 		setState(() {
 			_busqueda = result.q;
 			_filtroOrden = result.orden;
+			_categoriaFiltro = result.categoria;
 		});
 	}
 
@@ -237,22 +331,6 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 		}
 	}
 
-	Widget _buildMobileProductCards(List<StockProduct> productos, bool puedeGestionar) {
-		return Padding(
-			padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
-			child: Column(
-				crossAxisAlignment: CrossAxisAlignment.stretch,
-				children: [
-					for (final p in productos)
-						Padding(
-							padding: const EdgeInsets.only(bottom: 10),
-							child: _mobileProductCard(p, puedeGestionar),
-						),
-				],
-			),
-		);
-	}
-
 	Widget _mobileProductCard(StockProduct p, bool puedeGestionar) {
 		final cod = _codigoStock(p);
 		final sel = _idsSeleccionados.contains(p.id);
@@ -309,16 +387,10 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 											),
 										),
 										const SizedBox(height: 4),
-										Text(
-											"USO · ${p.categoria}",
-											style: TextStyle(
-												fontSize: 13,
-												height: 1.3,
-												color: Colors.grey.shade700,
-											),
-											maxLines: 4,
-											overflow: TextOverflow.ellipsis,
-										),
+										_detalleListaLinea("Categoría", p.categoria),
+										_detalleListaLinea("Marca", p.marca),
+										_detalleListaLinea("Desc. empresa", p.descripcionEmpresa),
+										_detalleListaLinea("Desc. fabricante", p.descripcionFabricante),
 										const SizedBox(height: 10),
 										Row(
 											children: [
@@ -331,7 +403,7 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 													),
 												),
 												const Spacer(),
-												_EstadoStockChip(bajo: _bajoStock(p)),
+												_EstadoStockChip(level: p.alertLevel),
 											],
 										),
 									],
@@ -432,11 +504,11 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 						onBack: () => _back(context),
 					),
 					Padding(
-						padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+						padding: EdgeInsets.fromLTRB(compact ? 12 : 16, 8, compact ? 12 : 16, 0),
 						child: Align(
 							alignment: compact ? Alignment.center : Alignment.centerRight,
 							child: TextButton.icon(
-								onPressed: _abrirBottomSheetFiltros,
+								onPressed: () => _abrirBottomSheetFiltros(productos),
 								icon: Icon(
 									_hayFiltrosActivos ? Icons.filter_alt : Icons.tune,
 									size: 20,
@@ -456,140 +528,86 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 						),
 					),
 					Expanded(
-						child: SingleChildScrollView(
-							padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
-							child: Center(
-								child: ConstrainedBox(
-									constraints: const BoxConstraints(maxWidth: 960),
-									child: Material(
-										color: AppTokens.whiteSurface,
-										borderRadius: BorderRadius.circular(AppTokens.radiusLg),
-										clipBehavior: Clip.antiAlias,
-										elevation: 1,
-										shadowColor: Colors.black12,
-										child: Column(
-											crossAxisAlignment: CrossAxisAlignment.stretch,
-											mainAxisSize: MainAxisSize.min,
-											children: [
-												Padding(
-													padding: const EdgeInsets.fromLTRB(10, 12, 10, 8),
-													child: !puedeGestionar
-															? Align(
-																	alignment: Alignment.centerLeft,
-																	child: Padding(
-																		padding: const EdgeInsets.symmetric(vertical: 6),
-																		child: Text(
-																			"Solo lectura. Agregar, editar o quitar productos "
-																			"corresponde al rol Pañol.",
-																			style: TextStyle(
-																				fontSize: 13,
-																				height: 1.35,
-																				color: Colors.grey.shade800,
-																				fontWeight: FontWeight.w600,
-																			),
-																		),
-																	),
-																)
-															: compact
-																	? LayoutBuilder(
-																	builder: (context, c) {
-																		final gap = 8.0;
-																		final colW = (c.maxWidth - gap) / 2;
-																		Widget cell(_PanolToolbarBtn btn) => SizedBox(
-																					width: colW,
-																					child: btn,
-																				);
-																		return Column(
-																			crossAxisAlignment:
-																					CrossAxisAlignment.stretch,
-																			children: [
-																				Row(
-																					children: [
-																						cell(
-																							_PanolToolbarBtn(
-																								stretch: true,
-																								label: _modoEdicion
-																										? "LISTO"
-																										: "EDITAR",
-																								icon: _modoEdicion
-																										? Icons.check
-																										: Icons.edit_outlined,
-																								bg: _modoEdicion
-																										? AppTokens.statusOk
-																										: AppTokens.yellowHeader,
-																								fg: _modoEdicion
-																										? Colors.white
-																										: Colors.black87,
-																								onPressed: () =>
-																										_setModoEdicion(
-																											!_modoEdicion,
-																										),
-																							),
-																						),
-																						SizedBox(width: gap),
-																						cell(
-																							_PanolToolbarBtn(
-																								stretch: true,
-																								label: "AÑADIR",
-																								icon: Icons.add,
-																								bg: AppTokens.yellowHeader,
-																								fg: Colors.black87,
-																								onPressed:
-																										_abrirBottomSheetAgregar,
-																							),
-																						),
-																					],
-																				),
-																				SizedBox(height: gap),
-																				Row(
-																					children: [
-																						Expanded(
-																							child: _PanolToolbarBtn(
-																								stretch: true,
-																								label: _modoEliminar
-																										? "LISTO"
-																										: "ELIMINAR",
-																								icon: _modoEliminar
-																										? Icons.check
-																										: Icons
-																												.delete_outline,
-																								bg: _modoEliminar
-																										? AppTokens.statusOk
-																										: AppTokens.redAction,
-																								fg: Colors.white,
-																								onPressed: () =>
-																										_setModoEliminar(
-																											!_modoEliminar,
-																										),
-																							),
-																						),
-																					],
-																				),
-																				if (_modoEliminar) ...[
-																					SizedBox(height: gap),
-																					_PanolToolbarBtn(
-																						stretch: true,
-																						label: _idsSeleccionados.isEmpty
-																								? "ELIMINAR SELECCIÓN"
-																								: "ELIMINAR (${_idsSeleccionados.length})",
-																						icon: Icons.delete_forever_outlined,
-																						bg: AppTokens.redAction,
-																						fg: Colors.white,
-																						onPressed: _idsSeleccionados.isEmpty
-																								? null
-																								: _confirmarEliminarSeleccion,
-																					),
-																				],
-																			],
-																		);
-																	},
-																)
-															: Wrap(
-																	spacing: 8,
-																	runSpacing: 8,
-																	alignment: WrapAlignment.start,
-																	children: [
+						child: compact
+								? Center(
+										child: ConstrainedBox(
+											constraints: const BoxConstraints(maxWidth: 960),
+											child: _buildStockPanel(
+												compact: true,
+												visibles: visibles,
+												productos: productos,
+												puedeGestionar: puedeGestionar,
+											),
+										),
+									)
+								: _buildStockPanel(
+										compact: false,
+										visibles: visibles,
+										productos: productos,
+										puedeGestionar: puedeGestionar,
+									),
+					),
+				],
+			),
+		);
+			},
+		);
+	}
+	Widget _buildStockPanel({
+		required bool compact,
+		required List<StockProduct> visibles,
+		required List<StockProduct> productos,
+		required bool puedeGestionar,
+	}) {
+		final toolbarPad = compact ? 10.0 : 16.0;
+
+		return Material(
+			color: AppTokens.whiteSurface,
+			borderRadius: compact
+					? BorderRadius.circular(AppTokens.radiusLg)
+					: BorderRadius.zero,
+			clipBehavior: Clip.antiAlias,
+			elevation: compact ? 1 : 0,
+			shadowColor: Colors.black12,
+			child: Column(
+				crossAxisAlignment: CrossAxisAlignment.stretch,
+				children: [
+					Padding(
+						padding: EdgeInsets.fromLTRB(toolbarPad, 12, toolbarPad, 8),
+						child: !puedeGestionar
+								? Align(
+										alignment: Alignment.centerLeft,
+										child: Padding(
+											padding: const EdgeInsets.symmetric(vertical: 6),
+											child: Text(
+												"Solo lectura. Agregar, editar o quitar productos "
+												"corresponde al rol Pañol.",
+												style: TextStyle(
+													fontSize: 13,
+													height: 1.35,
+													color: Colors.grey.shade800,
+													fontWeight: FontWeight.w600,
+												),
+											),
+										),
+									)
+								: compact
+										? LayoutBuilder(
+												builder: (context, c) {
+													final gap = 8.0;
+													final colW = (c.maxWidth - gap) / 2;
+													Widget cell(_PanolToolbarBtn btn) => SizedBox(
+																width: colW,
+																child: btn,
+															);
+													return Column(
+														crossAxisAlignment: CrossAxisAlignment.stretch,
+														children: [
+															Row(
+																children: [
+																	cell(
 																		_PanolToolbarBtn(
+																			stretch: true,
 																			label: _modoEdicion ? "LISTO" : "EDITAR",
 																			icon: _modoEdicion
 																					? Icons.check
@@ -597,17 +615,32 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 																			bg: _modoEdicion
 																					? AppTokens.statusOk
 																					: AppTokens.yellowHeader,
-																			fg: _modoEdicion ? Colors.white : Colors.black87,
-																			onPressed: () => _setModoEdicion(!_modoEdicion),
+																			fg: _modoEdicion
+																					? Colors.white
+																					: Colors.black87,
+																			onPressed: () =>
+																					_setModoEdicion(!_modoEdicion),
 																		),
+																	),
+																	SizedBox(width: gap),
+																	cell(
 																		_PanolToolbarBtn(
+																			stretch: true,
 																			label: "AÑADIR",
 																			icon: Icons.add,
 																			bg: AppTokens.yellowHeader,
 																			fg: Colors.black87,
 																			onPressed: _abrirBottomSheetAgregar,
 																		),
-																		_PanolToolbarBtn(
+																	),
+																],
+															),
+															SizedBox(height: gap),
+															Row(
+																children: [
+																	Expanded(
+																		child: _PanolToolbarBtn(
+																			stretch: true,
 																			label: _modoEliminar ? "LISTO" : "ELIMINAR",
 																			icon: _modoEliminar
 																					? Icons.check
@@ -616,208 +649,368 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 																					? AppTokens.statusOk
 																					: AppTokens.redAction,
 																			fg: Colors.white,
-																			onPressed: () => _setModoEliminar(!_modoEliminar),
+																			onPressed: () =>
+																					_setModoEliminar(!_modoEliminar),
 																		),
-																		if (_modoEliminar)
-																			_PanolToolbarBtn(
-																				label: _idsSeleccionados.isEmpty
-																						? "ELIMINAR SELECCIÓN"
-																						: "ELIMINAR (${_idsSeleccionados.length})",
-																				icon: Icons.delete_forever_outlined,
-																				bg: AppTokens.redAction,
-																				fg: Colors.white,
-																				onPressed: _idsSeleccionados.isEmpty
-																						? null
-																						: () {
-																								_confirmarEliminarSeleccion();
-																							},
-																			),
-																	],
+																	),
+																],
+															),
+															SizedBox(height: gap),
+															_PanolToolbarBtn(
+																stretch: true,
+																label: "CARGAR EXCEL",
+																icon: Icons.upload_file_outlined,
+																bg: Colors.black87,
+																fg: Colors.white,
+																onPressed: _cargarExcel,
+															),
+															if (_modoEliminar) ...[
+																SizedBox(height: gap),
+																_PanolToolbarBtn(
+																	stretch: true,
+																	label: _idsSeleccionados.isEmpty
+																			? "ELIMINAR SELECCIÓN"
+																			: "ELIMINAR (${_idsSeleccionados.length})",
+																	icon: Icons.delete_forever_outlined,
+																	bg: AppTokens.redAction,
+																	fg: Colors.white,
+																	onPressed: _idsSeleccionados.isEmpty
+																			? null
+																			: _confirmarEliminarSeleccion,
 																),
+															],
+														],
+													);
+												},
+											)
+										: Wrap(
+												spacing: 8,
+												runSpacing: 8,
+												alignment: WrapAlignment.start,
+												children: [
+													_PanolToolbarBtn(
+														label: _modoEdicion ? "LISTO" : "EDITAR",
+														icon: _modoEdicion ? Icons.check : Icons.edit_outlined,
+														bg: _modoEdicion
+																? AppTokens.statusOk
+																: AppTokens.yellowHeader,
+														fg: _modoEdicion ? Colors.white : Colors.black87,
+														onPressed: () => _setModoEdicion(!_modoEdicion),
+													),
+													_PanolToolbarBtn(
+														label: "AÑADIR",
+														icon: Icons.add,
+														bg: AppTokens.yellowHeader,
+														fg: Colors.black87,
+														onPressed: _abrirBottomSheetAgregar,
+													),
+													_PanolToolbarBtn(
+														label: "CARGAR EXCEL",
+														icon: Icons.upload_file_outlined,
+														bg: Colors.black87,
+														fg: Colors.white,
+														onPressed: _cargarExcel,
+													),
+													_PanolToolbarBtn(
+														label: _modoEliminar ? "LISTO" : "ELIMINAR",
+														icon: _modoEliminar ? Icons.check : Icons.delete_outline,
+														bg: _modoEliminar
+																? AppTokens.statusOk
+																: AppTokens.redAction,
+														fg: Colors.white,
+														onPressed: () => _setModoEliminar(!_modoEliminar),
+													),
+													if (_modoEliminar)
+														_PanolToolbarBtn(
+															label: _idsSeleccionados.isEmpty
+																	? "ELIMINAR SELECCIÓN"
+																	: "ELIMINAR (${_idsSeleccionados.length})",
+															icon: Icons.delete_forever_outlined,
+															bg: AppTokens.redAction,
+															fg: Colors.white,
+															onPressed: _idsSeleccionados.isEmpty
+																	? null
+																	: _confirmarEliminarSeleccion,
+														),
+												],
+											),
+					),
+					if (_modoEdicion && puedeGestionar)
+						Padding(
+							padding: EdgeInsets.fromLTRB(toolbarPad, 0, toolbarPad, 8),
+							child: DecoratedBox(
+								decoration: BoxDecoration(
+									color: AppTokens.yellowHeader.withValues(alpha: 0.35),
+									borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+									border: Border.all(color: Colors.black26),
+								),
+								child: const Padding(
+									padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+									child: Row(
+										children: [
+											Icon(Icons.touch_app, size: 22, color: Colors.black87),
+											SizedBox(width: 10),
+											Expanded(
+												child: Text(
+													"Modo edición: tocá una fila del producto que "
+													"quieras modificar.",
+													style: TextStyle(
+														fontSize: 13,
+														height: 1.3,
+														color: Colors.black87,
+														fontWeight: FontWeight.w600,
+													),
 												),
-												if (_modoEdicion && puedeGestionar)
-													Padding(
-														padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-														child: DecoratedBox(
-															decoration: BoxDecoration(
-																color: AppTokens.yellowHeader.withValues(alpha: 0.35),
-																borderRadius: BorderRadius.circular(
-																	AppTokens.radiusMd,
-																),
-																border: Border.all(color: Colors.black26),
-															),
-															child: const Padding(
-																padding: EdgeInsets.symmetric(
-																	horizontal: 12,
-																	vertical: 10,
-																),
-																child: Row(
-																	children: [
-																		Icon(Icons.touch_app, size: 22, color: Colors.black87),
-																		SizedBox(width: 10),
-																		Expanded(
-																			child: Text(
-																				"Modo edición: tocá una fila del producto que "
-																				"quieras modificar.",
-																				style: TextStyle(
-																					fontSize: 13,
-																					height: 1.3,
-																					color: Colors.black87,
-																					fontWeight: FontWeight.w600,
-																				),
-																			),
-																		),
-																	],
-																),
-															),
-														),
-													),
-												if (_modoEliminar && puedeGestionar)
-													Padding(
-														padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-														child: DecoratedBox(
-															decoration: BoxDecoration(
-																color: AppTokens.redAction.withValues(alpha: 0.12),
-																borderRadius: BorderRadius.circular(
-																	AppTokens.radiusMd,
-																),
-																border: Border.all(color: AppTokens.redAction.withValues(alpha: 0.45)),
-															),
-															child: const Padding(
-																padding: EdgeInsets.symmetric(
-																	horizontal: 12,
-																	vertical: 10,
-																),
-																child: Row(
-																	children: [
-																		Icon(Icons.checklist_rtl, size: 22, color: Colors.black87),
-																		SizedBox(width: 10),
-																		Expanded(
-																			child: Text(
-																				"Modo eliminar: marcá una o varias filas y "
-																				"tocá «ELIMINAR (N)» para borrarlas.",
-																				style: TextStyle(
-																					fontSize: 13,
-																					height: 1.3,
-																					color: Colors.black87,
-																					fontWeight: FontWeight.w600,
-																				),
-																			),
-																		),
-																	],
-																),
-															),
-														),
-													),
-												const Divider(height: 1),
-												if (visibles.isEmpty)
-													Padding(
-														padding: const EdgeInsets.fromLTRB(16, 28, 16, 36),
-														child: Text(
-															productos.isEmpty
-																	? "No hay productos en el catálogo."
-																	: "No hay productos que coincidan con los filtros o la búsqueda.",
-															textAlign: TextAlign.center,
-															style: TextStyle(
-																fontSize: 14,
-																height: 1.35,
-																color: Colors.grey.shade700,
-															),
-														),
-													)
-												else if (compact)
-													_buildMobileProductCards(visibles, puedeGestionar)
-												else
-													LayoutBuilder(
-														builder: (context, constraints) {
-															return SingleChildScrollView(
-																scrollDirection: Axis.horizontal,
-																child: ConstrainedBox(
-																	constraints: BoxConstraints(
-																		minWidth: constraints.maxWidth,
-																	),
-																	child: DataTable(
-																	showCheckboxColumn: puedeGestionar && _modoEliminar,
-																	headingRowColor: WidgetStateProperty.all(
-																		AppTokens.surfaceMuted,
-																	),
-																	dataRowMinHeight:
-																			puedeGestionar && (_modoEdicion || _modoEliminar)
-																					? 48
-																					: 44,
-																	horizontalMargin: 12,
-																	columnSpacing: 16,
-																	columns: const [
-																		DataColumn(label: Text("CÓDIGO")),
-																		DataColumn(label: Text("NOMBRE")),
-																		DataColumn(label: Text("USO")),
-																		DataColumn(
-																			label: Text("CANTIDAD"),
-																			numeric: true,
-																		),
-																		DataColumn(label: Text("ESTADO")),
-																	],
-																	rows: [
-																		for (final p in visibles)
-																			DataRow(
-																				selected: _idsSeleccionados.contains(p.id),
-																				onSelectChanged: puedeGestionar && _modoEliminar
-																						? (v) => _toggleSeleccionFila(p.id, v)
-																						: null,
-																				cells: [
-																					DataCell(
-																						Text(_codigoStock(p)),
-																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
-																								? () => _abrirModalEdicion(p)
-																								: null,
-																					),
-																					DataCell(
-																						Text(
-																							p.nombre,
-																							overflow: TextOverflow.ellipsis,
-																						),
-																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
-																								? () => _abrirModalEdicion(p)
-																								: null,
-																					),
-																					DataCell(
-																						Text(p.categoria),
-																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
-																								? () => _abrirModalEdicion(p)
-																								: null,
-																					),
-																					DataCell(
-																						Text("${p.cantidad}"),
-																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
-																								? () => _abrirModalEdicion(p)
-																								: null,
-																					),
-																					DataCell(
-																						_EstadoStockChip(bajo: _bajoStock(p)),
-																						onTap: puedeGestionar && _modoEdicion && !_modoEliminar
-																								? () => _abrirModalEdicion(p)
-																								: null,
-																					),
-																				],
-																			),
-																	],
-																),
-															),
-														);
-													},
-													),
-												const SizedBox(height: 8),
-											],
-										),
+											),
+										],
 									),
 								),
 							),
 						),
-					),
+					if (_modoEliminar && puedeGestionar)
+						Padding(
+							padding: EdgeInsets.fromLTRB(toolbarPad, 0, toolbarPad, 8),
+							child: DecoratedBox(
+								decoration: BoxDecoration(
+									color: AppTokens.redAction.withValues(alpha: 0.12),
+									borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+									border: Border.all(
+										color: AppTokens.redAction.withValues(alpha: 0.45),
+									),
+								),
+								child: const Padding(
+									padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+									child: Row(
+										children: [
+											Icon(Icons.checklist_rtl, size: 22, color: Colors.black87),
+											SizedBox(width: 10),
+											Expanded(
+												child: Text(
+													"Modo eliminar: marcá una o varias filas y "
+													"tocá «ELIMINAR (N)» para borrarlas.",
+													style: TextStyle(
+														fontSize: 13,
+														height: 1.3,
+														color: Colors.black87,
+														fontWeight: FontWeight.w600,
+													),
+												),
+											),
+										],
+									),
+								),
+							),
+						),
+					const Divider(height: 1),
+					if (visibles.isEmpty)
+						Expanded(
+							child: Center(
+								child: Padding(
+									padding: const EdgeInsets.fromLTRB(16, 28, 16, 36),
+									child: Text(
+										productos.isEmpty
+												? "No hay productos en el catálogo."
+												: "No hay productos que coincidan con los filtros o la búsqueda.",
+										textAlign: TextAlign.center,
+										style: TextStyle(
+											fontSize: 14,
+											height: 1.35,
+											color: Colors.grey.shade700,
+										),
+									),
+								),
+							),
+						)
+					else
+						Expanded(
+							child: compact
+									? _buildMobileStockList(visibles, puedeGestionar)
+									: _buildDesktopStockTable(visibles, puedeGestionar),
+						),
 				],
 			),
 		);
+	}
+
+	static const TextStyle _kTableHeaderStyle = TextStyle(
+		fontWeight: FontWeight.w700,
+		fontSize: 12,
+		letterSpacing: 0.3,
+		color: Colors.black87,
+	);
+
+	Widget _buildDesktopStockTable(List<StockProduct> visibles, bool puedeGestionar) {
+		final showCheck = puedeGestionar && _modoEliminar;
+		return LayoutBuilder(
+			builder: (context, constraints) {
+				final tableW = constraints.maxWidth > _kPanolStockTableWidth
+						? constraints.maxWidth
+						: _kPanolStockTableWidth;
+				return Scrollbar(
+					thumbVisibility: true,
+					notificationPredicate: (n) => n.metrics.axis == Axis.horizontal,
+					child: SingleChildScrollView(
+						scrollDirection: Axis.horizontal,
+						child: SizedBox(
+							width: tableW,
+							height: constraints.maxHeight,
+							child: Column(
+								crossAxisAlignment: CrossAxisAlignment.stretch,
+								children: [
+									_desktopTableHeader(showCheck),
+									Expanded(
+										child: Scrollbar(
+											child: ListView.builder(
+												itemCount: visibles.length,
+												itemBuilder: (context, i) => _desktopStockRow(
+													visibles[i],
+													puedeGestionar,
+													showCheck,
+												),
+											),
+										),
+									),
+								],
+							),
+						),
+					),
+				);
 			},
+		);
+	}
+
+	Widget _desktopTableHeader(bool showCheck) {
+		return Container(
+			color: AppTokens.surfaceMuted,
+			padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+			child: Row(
+				children: [
+					if (showCheck) const SizedBox(width: 48),
+					const SizedBox(width: 100, child: Text("CÓDIGO", style: _kTableHeaderStyle)),
+					const SizedBox(width: 12),
+					const SizedBox(width: 180, child: Text("NOMBRE", style: _kTableHeaderStyle)),
+					const SizedBox(width: 12),
+					const SizedBox(
+						width: 72,
+						child: Align(
+							alignment: Alignment.centerRight,
+							child: Text("CANTIDAD", style: _kTableHeaderStyle),
+						),
+					),
+					const SizedBox(width: 12),
+					const SizedBox(width: 100, child: Text("ESTADO", style: _kTableHeaderStyle)),
+					const SizedBox(width: 12),
+					const SizedBox(width: 140, child: Text("CATEGORÍA", style: _kTableHeaderStyle)),
+					const SizedBox(width: 12),
+					const SizedBox(width: 120, child: Text("MARCA", style: _kTableHeaderStyle)),
+					const SizedBox(width: 12),
+					const SizedBox(width: 200, child: Text("DESC. EMPRESA", style: _kTableHeaderStyle)),
+					const SizedBox(width: 12),
+					const Expanded(child: Text("DESC. FABRICANTE", style: _kTableHeaderStyle)),
+				],
+			),
+		);
+	}
+
+	Widget _desktopStockRow(StockProduct p, bool puedeGestionar, bool showCheck) {
+		final sel = _idsSeleccionados.contains(p.id);
+		return Material(
+			color: sel ? AppTokens.redAction.withValues(alpha: 0.08) : Colors.transparent,
+			child: InkWell(
+				onTap: showCheck
+						? () => _toggleSeleccionFila(p.id, !sel)
+						: () => _onTapEditarFila(p, puedeGestionar),
+				child: Container(
+					constraints: const BoxConstraints(minHeight: 48, maxHeight: 80),
+					padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+					decoration: BoxDecoration(
+						border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+					),
+					child: Row(
+						crossAxisAlignment: CrossAxisAlignment.center,
+						children: [
+							if (showCheck)
+								SizedBox(
+									width: 48,
+									child: Checkbox(
+										value: sel,
+										onChanged: (v) => _toggleSeleccionFila(p.id, v),
+									),
+								),
+							SizedBox(
+								width: 100,
+								child: Text(
+									_codigoStock(p),
+									overflow: TextOverflow.ellipsis,
+								),
+							),
+							const SizedBox(width: 12),
+							SizedBox(
+								width: 180,
+								child: Text(
+									p.nombre,
+									maxLines: 2,
+									overflow: TextOverflow.ellipsis,
+								),
+							),
+							const SizedBox(width: 12),
+							SizedBox(
+								width: 72,
+								child: Align(
+									alignment: Alignment.centerRight,
+									child: Text(
+										"${p.cantidad}",
+										style: const TextStyle(
+											fontWeight: FontWeight.w700,
+											fontSize: 15,
+										),
+									),
+								),
+							),
+							const SizedBox(width: 12),
+							SizedBox(width: 100, child: _EstadoStockChip(level: p.alertLevel)),
+							const SizedBox(width: 12),
+							SizedBox(
+								width: 140,
+								child: _celdaLista(p.categoria, minWidth: 100, maxWidth: 140),
+							),
+							const SizedBox(width: 12),
+							SizedBox(
+								width: 120,
+								child: _celdaLista(p.marca, minWidth: 96, maxWidth: 120),
+							),
+							const SizedBox(width: 12),
+							SizedBox(
+								width: 200,
+								child: _celdaLista(
+									p.descripcionEmpresa,
+									minWidth: 160,
+									maxWidth: 200,
+								),
+							),
+							const SizedBox(width: 12),
+							Expanded(
+								child: _celdaLista(
+									p.descripcionFabricante,
+									minWidth: 160,
+									maxWidth: 280,
+								),
+							),
+						],
+					),
+				),
+			),
+		);
+	}
+
+	Widget _buildMobileStockList(List<StockProduct> productos, bool puedeGestionar) {
+		return ListView.builder(
+			padding: const EdgeInsets.fromLTRB(10, 12, 10, 16),
+			itemCount: productos.length,
+			itemBuilder: (context, i) => Padding(
+				padding: const EdgeInsets.only(bottom: 10),
+				child: _mobileProductCard(productos[i], puedeGestionar),
+			),
 		);
 	}
 }
@@ -827,10 +1020,14 @@ class _PanolFiltrosStockBottomSheet extends StatefulWidget {
 	const _PanolFiltrosStockBottomSheet({
 		required this.busquedaInicial,
 		required this.ordenInicial,
+		required this.categoriaInicial,
+		required this.categorias,
 	});
 
 	final String busquedaInicial;
 	final _PanolStockFilterSort ordenInicial;
+	final String? categoriaInicial;
+	final List<String> categorias;
 
 	@override
 	State<_PanolFiltrosStockBottomSheet> createState() => _PanolFiltrosStockBottomSheetState();
@@ -839,12 +1036,14 @@ class _PanolFiltrosStockBottomSheet extends StatefulWidget {
 class _PanolFiltrosStockBottomSheetState extends State<_PanolFiltrosStockBottomSheet> {
 	late final TextEditingController _busquedaCtrl;
 	late _PanolStockFilterSort _orden;
+	late String? _categoria;
 
 	@override
 	void initState() {
 		super.initState();
 		_busquedaCtrl = TextEditingController(text: widget.busquedaInicial);
 		_orden = widget.ordenInicial;
+		_categoria = widget.categoriaInicial;
 	}
 
 	@override
@@ -856,14 +1055,14 @@ class _PanolFiltrosStockBottomSheetState extends State<_PanolFiltrosStockBottomS
 	void _aplicar() {
 		Navigator.pop(
 			context,
-			(q: _busquedaCtrl.text.trim(), orden: _orden),
+			(q: _busquedaCtrl.text.trim(), orden: _orden, categoria: _categoria),
 		);
 	}
 
 	void _restablecer() {
 		Navigator.pop(
 			context,
-			(q: "", orden: _PanolStockFilterSort.catalogo),
+			(q: "", orden: _PanolStockFilterSort.catalogo, categoria: null),
 		);
 	}
 
@@ -930,7 +1129,7 @@ class _PanolFiltrosStockBottomSheetState extends State<_PanolFiltrosStockBottomS
 											decoration: InputDecoration(
 												isDense: true,
 												prefixIcon: const Icon(Icons.search, color: Colors.black54),
-												hintText: "Buscar por producto, código o categoría",
+												hintText: "Buscar por código, nombre, marca, categoría o descripción",
 												border: OutlineInputBorder(
 													borderRadius: BorderRadius.circular(AppTokens.radiusMd),
 												),
@@ -938,6 +1137,47 @@ class _PanolFiltrosStockBottomSheetState extends State<_PanolFiltrosStockBottomS
 												fillColor: AppTokens.surfaceMuted,
 											),
 											onChanged: (_) => setState(() {}),
+										),
+										const SizedBox(height: 18),
+										Text(
+											"Categoría",
+											style: TextStyle(
+												fontWeight: FontWeight.w700,
+												fontSize: 13,
+												color: Colors.grey.shade800,
+											),
+										),
+										const SizedBox(height: 6),
+										DropdownButtonFormField<String?>(
+											value: _categoria != null && widget.categorias.contains(_categoria)
+													? _categoria
+													: null,
+											isExpanded: true,
+											decoration: InputDecoration(
+												isDense: true,
+												hintText: "Todas las categorías",
+												border: OutlineInputBorder(
+													borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+												),
+												filled: true,
+												fillColor: AppTokens.surfaceMuted,
+												contentPadding: const EdgeInsets.symmetric(
+													horizontal: 12,
+													vertical: 10,
+												),
+											),
+											items: [
+												const DropdownMenuItem<String?>(
+													value: null,
+													child: Text("Todas"),
+												),
+												for (final c in widget.categorias)
+													DropdownMenuItem<String?>(
+														value: c,
+														child: Text(c),
+													),
+											],
+											onChanged: (v) => setState(() => _categoria = v),
 										),
 										const SizedBox(height: 18),
 										Text(
@@ -1113,8 +1353,13 @@ class _EditarProductoStockDialogState extends State<_EditarProductoStockDialog> 
 	final _formKey = GlobalKey<FormState>();
 	late final TextEditingController _codigo;
 	late final TextEditingController _nombre;
+	late final TextEditingController _descripcionEmpresa;
+	late final TextEditingController _descripcionFabricante;
 	late final TextEditingController _categoria;
+	late final TextEditingController _marca;
 	late final TextEditingController _cantidad;
+	late final TextEditingController _minimo;
+	late final TextEditingController _maximo;
 
 	@override
 	void initState() {
@@ -1122,30 +1367,50 @@ class _EditarProductoStockDialogState extends State<_EditarProductoStockDialog> 
 		final p = widget.producto;
 		_codigo = TextEditingController(text: p.codigo?.trim() ?? "");
 		_nombre = TextEditingController(text: p.nombre);
+		_descripcionEmpresa = TextEditingController(text: p.descripcionEmpresa);
+		_descripcionFabricante = TextEditingController(text: p.descripcionFabricante);
 		_categoria = TextEditingController(text: p.categoria);
+		_marca = TextEditingController(text: p.marca);
 		_cantidad = TextEditingController(text: "${p.cantidad}");
+		_minimo = TextEditingController(text: "${p.cantidadMinima}");
+		_maximo = TextEditingController(text: "${p.cantidadMaxima}");
 	}
 
 	@override
 	void dispose() {
 		_codigo.dispose();
 		_nombre.dispose();
+		_descripcionEmpresa.dispose();
+		_descripcionFabricante.dispose();
 		_categoria.dispose();
+		_marca.dispose();
 		_cantidad.dispose();
+		_minimo.dispose();
+		_maximo.dispose();
 		super.dispose();
 	}
 
 	void _guardar() {
 		if (!_formKey.currentState!.validate()) return;
 		final cant = int.tryParse(_cantidad.text.trim());
-		if (cant == null || cant < 0) return;
+		final min = int.tryParse(_minimo.text.trim());
+		final max = int.tryParse(_maximo.text.trim());
+		if (cant == null || cant < 0 || min == null || min < 0 || max == null || max < 0) {
+			return;
+		}
+		if (max > 0 && min > max) return;
 		final cod = _codigo.text.trim();
 		final actualizado = StockProduct(
 			id: widget.producto.id,
 			nombre: _nombre.text.trim(),
 			categoria: _categoria.text.trim(),
 			cantidad: cant,
+			cantidadMinima: min,
+			cantidadMaxima: max,
 			codigo: cod.isEmpty ? null : cod,
+			descripcionEmpresa: _descripcionEmpresa.text.trim(),
+			descripcionFabricante: _descripcionFabricante.text.trim(),
+			marca: _marca.text.trim(),
 		);
 		Navigator.of(context).pop(actualizado);
 	}
@@ -1153,11 +1418,6 @@ class _EditarProductoStockDialogState extends State<_EditarProductoStockDialog> 
 	@override
 	Widget build(BuildContext context) {
 		final p = widget.producto;
-		final codigoMostrado = p.codigo != null && p.codigo!.trim().isNotEmpty
-				? p.codigo!.trim()
-				: p.id.length >= 8
-						? p.id.substring(0, 8).toUpperCase()
-						: p.id.toUpperCase();
 
 		return AlertDialog(
 			title: const Text("Editar producto"),
@@ -1169,17 +1429,23 @@ class _EditarProductoStockDialogState extends State<_EditarProductoStockDialog> 
 						crossAxisAlignment: CrossAxisAlignment.stretch,
 						children: [
 							Text(
-								"ID interno: ${p.id} · Código mostrado: $codigoMostrado",
+								"ID interno: ${p.id}",
 								style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
 							),
 							const SizedBox(height: 16),
 							TextFormField(
 								controller: _codigo,
+								textCapitalization: TextCapitalization.characters,
 								decoration: const InputDecoration(
 									labelText: "Código",
 									border: OutlineInputBorder(),
-									hintText: "Opcional; vacío = código generado",
 								),
+								validator: (v) {
+									if (v == null || v.trim().isEmpty) {
+										return "Ingresá el código";
+									}
+									return null;
+								},
 							),
 							const SizedBox(height: 12),
 							TextFormField(
@@ -1198,15 +1464,96 @@ class _EditarProductoStockDialogState extends State<_EditarProductoStockDialog> 
 							),
 							const SizedBox(height: 12),
 							TextFormField(
-								controller: _categoria,
-								textCapitalization: TextCapitalization.words,
+								controller: _descripcionEmpresa,
+								textCapitalization: TextCapitalization.sentences,
+								maxLines: 3,
 								decoration: const InputDecoration(
-									labelText: "Uso / categoría",
+									labelText: "Descripción empresa",
 									border: OutlineInputBorder(),
 								),
 								validator: (v) {
 									if (v == null || v.trim().isEmpty) {
-										return "Ingresá la categoría o uso";
+										return "Ingresá la descripción empresa";
+									}
+									return null;
+								},
+							),
+							const SizedBox(height: 12),
+							TextFormField(
+								controller: _descripcionFabricante,
+								textCapitalization: TextCapitalization.sentences,
+								maxLines: 3,
+								decoration: const InputDecoration(
+									labelText: "Descripción fabricante",
+									border: OutlineInputBorder(),
+								),
+								validator: (v) {
+									if (v == null || v.trim().isEmpty) {
+										return "Ingresá la descripción fabricante";
+									}
+									return null;
+								},
+							),
+							const SizedBox(height: 12),
+							TextFormField(
+								controller: _categoria,
+								textCapitalization: TextCapitalization.words,
+								decoration: const InputDecoration(
+									labelText: "Categoría",
+									border: OutlineInputBorder(),
+								),
+								validator: (v) {
+									if (v == null || v.trim().isEmpty) {
+										return "Ingresá la categoría";
+									}
+									return null;
+								},
+							),
+							const SizedBox(height: 12),
+							TextFormField(
+								controller: _marca,
+								textCapitalization: TextCapitalization.words,
+								decoration: const InputDecoration(
+									labelText: "Marca",
+									border: OutlineInputBorder(),
+								),
+								validator: (v) {
+									if (v == null || v.trim().isEmpty) {
+										return "Ingresá la marca";
+									}
+									return null;
+								},
+							),
+							const SizedBox(height: 12),
+							TextFormField(
+								controller: _minimo,
+								keyboardType: TextInputType.number,
+								inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+								decoration: const InputDecoration(
+									labelText: "Cantidad mínima (alerta bajo stock)",
+									border: OutlineInputBorder(),
+								),
+								validator: (v) {
+									final n = int.tryParse((v ?? "").trim());
+									if (n == null || n < 0) return "Mínimo ≥ 0";
+									return null;
+								},
+							),
+							const SizedBox(height: 12),
+							TextFormField(
+								controller: _maximo,
+								keyboardType: TextInputType.number,
+								inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+								decoration: const InputDecoration(
+									labelText: "Cantidad máxima (alerta alto stock)",
+									border: OutlineInputBorder(),
+								),
+								validator: (v) {
+									final n = int.tryParse((v ?? "").trim());
+									if (n == null || n < 0) return "Máximo ≥ 0";
+									final min = int.tryParse(_minimo.text.trim());
+									if (min != null && n > 0 && min > n) {
+										return "Máximo ≥ mínimo";
 									}
 									return null;
 								},
@@ -1294,14 +1641,25 @@ class _PanolToolbarBtn extends StatelessWidget {
 }
 
 class _EstadoStockChip extends StatelessWidget {
-	const _EstadoStockChip({required this.bajo});
+	const _EstadoStockChip({required this.level});
 
-	final bool bajo;
+	final StockAlertLevel level;
 
 	@override
 	Widget build(BuildContext context) {
-		final text = bajo ? "BAJO STOCK" : "OK";
-		final bg = bajo ? AppTokens.redAction : AppTokens.statusOk;
+		final String text;
+		final Color bg;
+		switch (level) {
+			case StockAlertLevel.bajo:
+				text = "BAJO STOCK";
+				bg = AppTokens.redAction;
+			case StockAlertLevel.alto:
+				text = "ALTO STOCK";
+				bg = Colors.orange.shade800;
+			case StockAlertLevel.ok:
+				text = "OK";
+				bg = AppTokens.statusOk;
+		}
 		return Container(
 			padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
 			decoration: BoxDecoration(

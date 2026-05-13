@@ -99,8 +99,19 @@ class MaintenanceOrdersRepository {
 					"panol_requested_compras",
 					"compras_oc_notified",
 					"compras_arrived_notified",
+					"supervisor_stock_ok",
 				])
 				.order("created_at", ascending: false);
+		return _mapList(rows);
+	}
+
+	/// Historial pañol: pedidos cerrados o cancelados que pasaron por su circuito.
+	Future<List<MaintenanceOrder>> fetchPanolOrderHistory() async {
+		final rows = await _client
+				.from("maintenance_orders")
+				.select()
+				.inFilter("workflow_status", ["completed", "cancelled"])
+				.order("updated_at", ascending: false);
 		return _mapList(rows);
 	}
 
@@ -141,11 +152,13 @@ class MaintenanceOrdersRepository {
 	}
 
 	Future<void> markCompleted(String orderId) async {
-		await _client
-				.from("maintenance_orders")
-				.update({"workflow_status": "completed"})
-				.eq("id", orderId)
-				.inFilter("workflow_status", ["supervisor_stock_ok", "compras_arrived_notified"]);
+		if (_client.auth.currentUser?.id == null) {
+			throw Exception("No hay sesión");
+		}
+		await _client.rpc<void>(
+			"complete_maintenance_order_with_inventory",
+			params: <String, dynamic>{"p_order_id": orderId},
+		);
 	}
 
 	/// Pañol: material ubicado fuera del catálogo digital; pasa a retiro (aviso vía trigger en BD).
@@ -155,6 +168,25 @@ class MaintenanceOrdersRepository {
 				.update({"workflow_status": "supervisor_stock_ok"})
 				.eq("id", orderId)
 				.eq("workflow_status", "forwarded_to_panol");
+	}
+
+	/// Pañol: registra cantidad en inventario y marca pedido listo para retiro.
+	Future<void> panolConfirmCatalogStock({
+		required String orderId,
+		required String stockItemId,
+		required int cantidad,
+	}) async {
+		if (_client.auth.currentUser?.id == null) {
+			throw Exception("No hay sesión");
+		}
+		await _client.rpc<void>(
+			"panol_confirm_stock_with_inventory",
+			params: <String, dynamic>{
+				"p_order_id": orderId,
+				"p_stock_item_id": stockItemId,
+				"p_cantidad": cantidad,
+			},
+		);
 	}
 
 	Future<void> insertOrderNotification({
@@ -202,6 +234,25 @@ class MaintenanceOrdersRepository {
 					"read_at": DateTime.now().toUtc().toIso8601String(),
 				})
 				.eq("id", notificationId)
+				.eq("user_id", uid);
+	}
+
+	Future<void> dismissNotification(String notificationId) async {
+		final uid = _client.auth.currentUser?.id;
+		if (uid == null) return;
+		await _client
+				.from("maintenance_order_notifications")
+				.delete()
+				.eq("id", notificationId)
+				.eq("user_id", uid);
+	}
+
+	Future<void> dismissAllMyNotifications() async {
+		final uid = _client.auth.currentUser?.id;
+		if (uid == null) return;
+		await _client
+				.from("maintenance_order_notifications")
+				.delete()
 				.eq("user_id", uid);
 	}
 }

@@ -4,6 +4,7 @@ import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
+import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
 import "../application/compras_in_app_notifications_provider.dart";
 import "../application/compras_stock_repository_provider.dart";
 
@@ -139,6 +140,38 @@ class _ComprasHeader extends StatelessWidget {
 class _ComprasNotificationsBlock extends ConsumerWidget {
 	const _ComprasNotificationsBlock();
 
+	Future<void> _borrarTodas(BuildContext context, WidgetRef ref) async {
+		final ok = await showDialog<bool>(
+			context: context,
+			builder: (ctx) => AlertDialog(
+				title: const Text("Borrar todos los avisos"),
+				content: const Text(
+					"¿Querés eliminar todos los avisos de pedidos desde pañol?",
+				),
+				actions: [
+					TextButton(
+						onPressed: () => Navigator.pop(ctx, false),
+						child: const Text("Cancelar"),
+					),
+					FilledButton(
+						onPressed: () => Navigator.pop(ctx, true),
+						child: const Text("Borrar todas"),
+					),
+				],
+			),
+		);
+		if (ok != true) return;
+		try {
+			await ref.read(comprasStockRepositoryProvider).dismissAllMyNotifications();
+			ref.invalidate(comprasInAppNotificationsProvider);
+		} catch (e) {
+			if (!context.mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudieron borrar los avisos: $e")),
+			);
+		}
+	}
+
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
 		final async = ref.watch(comprasInAppNotificationsProvider);
@@ -171,12 +204,30 @@ class _ComprasNotificationsBlock extends ConsumerWidget {
 											color: Colors.amber.shade900,
 										),
 										const SizedBox(width: 8),
-										Text(
-											"Nuevos pedidos desde pañol",
-											style: TextStyle(
-												fontWeight: FontWeight.bold,
-												fontSize: 14,
-												color: Colors.amber.shade900,
+										Expanded(
+											child: Text(
+												"Nuevos pedidos desde pañol",
+												style: TextStyle(
+													fontWeight: FontWeight.bold,
+													fontSize: 14,
+													color: Colors.amber.shade900,
+												),
+											),
+										),
+										TextButton(
+											onPressed: () => _borrarTodas(context, ref),
+											style: TextButton.styleFrom(
+												padding: const EdgeInsets.symmetric(horizontal: 8),
+												minimumSize: Size.zero,
+												tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+											),
+											child: Text(
+												"Borrar todas",
+												style: TextStyle(
+													fontSize: 12,
+													fontWeight: FontWeight.w700,
+													color: Colors.amber.shade900,
+												),
 											),
 										),
 									],
@@ -218,16 +269,26 @@ class _ComprasNotificationsBlock extends ConsumerWidget {
 																],
 															),
 														),
-														TextButton(
+														IconButton(
+															tooltip: "Descartar aviso",
+															icon: Icon(
+																Icons.close,
+																size: 20,
+																color: Colors.grey.shade600,
+															),
+															padding: EdgeInsets.zero,
+															constraints: const BoxConstraints(
+																minWidth: 36,
+																minHeight: 36,
+															),
 															onPressed: () async {
 																await ref
 																		.read(comprasStockRepositoryProvider)
-																		.markNotificationRead(n.id);
+																		.dismissNotification(n.id);
 																ref.invalidate(
 																	comprasInAppNotificationsProvider,
 																);
 															},
-															child: const Text("OK"),
 														),
 													],
 												),
@@ -312,6 +373,8 @@ class _ComprasMainTab extends ConsumerWidget {
 								],
 							),
 							const SizedBox(height: 16),
+							const MaintenanceNotificationsBlock(),
+							const SizedBox(height: 12),
 							const _ComprasNotificationsBlock(),
 							const SizedBox(height: 12),
 							_ComprasMenuCard(

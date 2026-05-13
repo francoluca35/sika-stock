@@ -13,6 +13,8 @@ class ComprasPanolStockRequestRow {
 		required this.panolUserId,
 		this.imagenUrl,
 		this.maintenanceWorkflowStatus,
+		this.maintenanceCreatedAt,
+		this.maintenanceUpdatedAt,
 	});
 
 	final String id;
@@ -28,13 +30,27 @@ class ComprasPanolStockRequestRow {
 	final String? imagenUrl;
 	/// `maintenance_orders.workflow_status` (join opcional).
 	final String? maintenanceWorkflowStatus;
+	/// Alta del pedido de mantenimiento (join opcional).
+	final DateTime? maintenanceCreatedAt;
+	/// Última actualización del pedido (p. ej. aviso OC / llegada).
+	final DateTime? maintenanceUpdatedAt;
 
 	factory ComprasPanolStockRequestRow.fromJson(Map<String, dynamic> m) {
 		final c = m["created_at"];
 		String? moWs;
+		DateTime? moCreated;
+		DateTime? moUpdated;
 		final mo = m["maintenance_orders"];
 		if (mo is Map<String, dynamic>) {
 			moWs = mo["workflow_status"] as String?;
+			final rawC = mo["created_at"];
+			if (rawC != null) {
+				moCreated = rawC is DateTime ? rawC : DateTime.tryParse(rawC.toString());
+			}
+			final rawU = mo["updated_at"];
+			if (rawU != null) {
+				moUpdated = rawU is DateTime ? rawU : DateTime.tryParse(rawU.toString());
+			}
 		}
 		return ComprasPanolStockRequestRow(
 			id: m["id"] as String,
@@ -49,6 +65,8 @@ class ComprasPanolStockRequestRow {
 			panolUserId: m["panol_user_id"] as String,
 			imagenUrl: m["imagen_url"] as String?,
 			maintenanceWorkflowStatus: moWs,
+			maintenanceCreatedAt: moCreated,
+			maintenanceUpdatedAt: moUpdated,
 		);
 	}
 }

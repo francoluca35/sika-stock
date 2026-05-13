@@ -288,7 +288,7 @@ class _ComprasHistorialPedidosScreenState
 			case _EstadoAvisoPedido.pendiente:
 				return "Pendiente: aún no se envió aviso de OC emitida.";
 			case _EstadoAvisoPedido.ordenEmitidaAvisada:
-				return "Aviso enviado: OC emitida. Pendiente aviso de llegada a planta.";
+				return "Aviso enviado: OC emitida. Pendiente aviso de llegada a planta (Compras o Pañol).";
 			case _EstadoAvisoPedido.enPlanta:
 				return "Material registrado en planta.";
 		}
