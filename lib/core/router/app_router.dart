@@ -20,6 +20,7 @@ import "../../features/panol/presentation/panol_stock_screen.dart";
 import "../../features/stock/presentation/add_stock_screen.dart";
 import "../../features/stock/presentation/categories_screen.dart";
 import "../../features/stock/presentation/stock_home_screen.dart";
+import "../../features/supervisor/presentation/supervisor_catalog_retiro_screen.dart";
 import "../../features/supervisor/presentation/supervisor_maintenance_history_screen.dart";
 import "../../features/supervisor/presentation/supervisor_maintenance_orders_screen.dart";
 import "../../features/supervisor/presentation/supervisor_stock_screen.dart";
@@ -135,7 +136,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				path: "/panol/categorias",
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
-					child: const CategoriesScreen(fallbackLocation: "/home"),
+					child: const CategoriesScreen(
+						fallbackLocation: "/home",
+						allowPanolCategoryMutations: true,
+					),
 				),
 			),
 			GoRoute(
@@ -143,6 +147,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const SupervisorStockScreen(),
+				),
+			),
+			GoRoute(
+				path: "/supervisor/elegir-producto-retiro",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const SupervisorCatalogRetiroScreen(),
 				),
 			),
 			GoRoute(

@@ -1,43 +1,60 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
-import "../domain/stock_category_defaults.dart";
+import "../../auth/application/auth_providers.dart";
+import "../data/stock_categories_repository.dart";
+import "../domain/stock_category.dart";
 
-/// Lista de categorías en **memoria** (compartida entre Agregar stock y Categorías).
-/// Más adelante: sustituir por tabla Supabase.
+final stockCategoriesRepositoryProvider = Provider<StockCategoriesRepository>(
+	(ref) => StockCategoriesRepository(ref.watch(supabaseClientProvider)),
+);
+
+/// Categorías persistidas en Supabase (`stock_categories`).
 final stockCategoriesProvider =
-		NotifierProvider<StockCategoriesNotifier, List<String>>(StockCategoriesNotifier.new);
+		AsyncNotifierProvider<StockCategoriesNotifier, List<StockCategory>>(
+	StockCategoriesNotifier.new,
+);
 
-class StockCategoriesNotifier extends Notifier<List<String>> {
+class StockCategoriesNotifier extends AsyncNotifier<List<StockCategory>> {
 	@override
-	List<String> build() => List<String>.from(kDefaultStockCategories);
-
-	/// `false` si ya existía (mismo texto ignorando mayúsculas).
-	bool addCategory(String raw) {
-		final name = raw.trim();
-		if (name.length < 2) return false;
-		final lower = name.toLowerCase();
-		if (state.any((e) => e.toLowerCase() == lower)) return false;
-		state = [...state, name];
-		return true;
+	Future<List<StockCategory>> build() async {
+		return ref.read(stockCategoriesRepositoryProvider).fetchAll();
 	}
 
-	/// `false` si el nombre ya lo tiene otra categoría.
-	bool updateAt(int index, String raw) {
-		if (index < 0 || index >= state.length) return false;
+	Future<void> refresh() async {
+		state = const AsyncValue.loading();
+		state = await AsyncValue.guard(
+			() => ref.read(stockCategoriesRepositoryProvider).fetchAll(),
+		);
+	}
+
+	/// `false` si falla (duplicado, red, permisos, etc.).
+	Future<bool> addCategory(String raw) async {
 		final name = raw.trim();
 		if (name.length < 2) return false;
-		final lower = name.toLowerCase();
-		for (var i = 0; i < state.length; i++) {
-			if (i != index && state[i].toLowerCase() == lower) return false;
+		try {
+			await ref.read(stockCategoriesRepositoryProvider).insert(name);
+		} catch (_) {
+			return false;
 		}
-		final next = [...state];
-		next[index] = name;
-		state = next;
+		await refresh();
 		return true;
 	}
 
-	void removeAt(int index) {
-		if (index < 0 || index >= state.length) return;
-		state = [...state]..removeAt(index);
+	/// `false` si el nombre ya existe en otra fila o falla la actualización.
+	Future<bool> updateCategory(String id, String raw) async {
+		final name = raw.trim();
+		if (name.length < 2) return false;
+		try {
+			await ref.read(stockCategoriesRepositoryProvider).updateName(id, name);
+		} catch (_) {
+			return false;
+		}
+		await refresh();
+		return true;
+	}
+
+	Future<void> deleteById(String id) async {
+		await ref.read(stockCategoriesRepositoryProvider).deleteById(id);
+		await refresh();
 	}
 }

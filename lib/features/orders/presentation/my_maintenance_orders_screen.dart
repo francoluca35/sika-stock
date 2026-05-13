@@ -6,6 +6,7 @@ import "../../../core/theme/app_tokens.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../supervisor/domain/maintenance_order.dart";
 import "../application/mis_pedidos_mantenimiento_provider.dart";
+import "widgets/maintenance_order_seguimiento_sheet.dart";
 
 String _estadoMantenimientoTexto(MaintenanceWorkflowStatus w) {
 	switch (w) {
@@ -15,6 +16,12 @@ String _estadoMantenimientoTexto(MaintenanceWorkflowStatus w) {
 			return "Stock confirmado — podés retirar";
 		case MaintenanceWorkflowStatus.forwardedToPanol:
 			return "En pañol (sin stock) — consulta";
+		case MaintenanceWorkflowStatus.panolRequestedCompras:
+			return "En pañol — pedido a compras (seguimiento)";
+		case MaintenanceWorkflowStatus.comprasOcNotified:
+			return "Consulta — OC emitida (compras)";
+		case MaintenanceWorkflowStatus.comprasArrivedNotified:
+			return "Material en planta — coordinar retiro";
 		case MaintenanceWorkflowStatus.completed:
 			return "Completado";
 		case MaintenanceWorkflowStatus.cancelled:
@@ -77,42 +84,51 @@ class MyMaintenanceOrdersScreen extends ConsumerWidget {
 										separatorBuilder: (_, __) => const SizedBox(height: 10),
 										itemBuilder: (ctx, i) {
 											final o = lista[i];
-											return Card(
-												elevation: 0,
-												color: AppTokens.whiteSurface,
-												shape: RoundedRectangleBorder(
+											return Material(
+												color: Colors.transparent,
+												child: InkWell(
 													borderRadius: BorderRadius.circular(
 														AppTokens.radiusMd,
 													),
-													side: const BorderSide(color: AppTokens.greyBorder),
-												),
-												child: Padding(
-													padding: const EdgeInsets.all(14),
-													child: Column(
-														crossAxisAlignment: CrossAxisAlignment.start,
-														children: [
-															Text(
-																o.numeroOrden,
-																style: const TextStyle(
-																	fontWeight: FontWeight.bold,
-																	fontSize: 15,
-																),
+													onTap: () => showMaintenanceOrderSeguimientoSheet(context, o),
+													child: Card(
+														elevation: 0,
+														color: AppTokens.whiteSurface,
+														shape: RoundedRectangleBorder(
+															borderRadius: BorderRadius.circular(
+																AppTokens.radiusMd,
 															),
-															const SizedBox(height: 6),
-															Text(
-																o.producto,
-																style: const TextStyle(fontSize: 14),
+															side: const BorderSide(color: AppTokens.greyBorder),
+														),
+														child: Padding(
+															padding: const EdgeInsets.all(14),
+															child: Column(
+																crossAxisAlignment: CrossAxisAlignment.start,
+																children: [
+																	Text(
+																		o.numeroOrden,
+																		style: const TextStyle(
+																			fontWeight: FontWeight.bold,
+																			fontSize: 15,
+																		),
+																	),
+																	const SizedBox(height: 6),
+																	Text(
+																		o.producto,
+																		style: const TextStyle(fontSize: 14),
+																	),
+																	const SizedBox(height: 8),
+																	Text(
+																		_estadoMantenimientoTexto(o.workflowStatus),
+																		style: TextStyle(
+																			fontSize: 13,
+																			color: Colors.grey.shade800,
+																			fontWeight: FontWeight.w600,
+																		),
+																	),
+																],
 															),
-															const SizedBox(height: 8),
-															Text(
-																_estadoMantenimientoTexto(o.workflowStatus),
-																style: TextStyle(
-																	fontSize: 13,
-																	color: Colors.grey.shade800,
-																	fontWeight: FontWeight.w600,
-																),
-															),
-														],
+														),
 													),
 												),
 											);

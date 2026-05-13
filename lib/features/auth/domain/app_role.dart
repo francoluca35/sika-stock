@@ -39,6 +39,11 @@ bool appRolePuedeCrearPedidoMantenimiento(AppRole? rol) {
 	}
 }
 
+/// Solo **Pañol** puede crear, editar o eliminar filas en `stock_items` (RLS alineado).
+bool appRolePuedeGestionarStock(AppRole? rol) {
+	return rol == AppRole.panol;
+}
+
 /// Roles con acceso a la pantalla **Seguimiento** (`/panol/seguimiento`).
 bool appRolePuedeAccederASeguimiento(AppRole? rol) {
 	switch (rol) {

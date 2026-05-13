@@ -11,6 +11,9 @@ enum MaintenanceWorkflowStatus {
 	pendingSupervisor,
 	supervisorStockOk,
 	forwardedToPanol,
+	panolRequestedCompras,
+	comprasOcNotified,
+	comprasArrivedNotified,
 	completed,
 	cancelled;
 
@@ -22,6 +25,12 @@ enum MaintenanceWorkflowStatus {
 				return MaintenanceWorkflowStatus.supervisorStockOk;
 			case "forwarded_to_panol":
 				return MaintenanceWorkflowStatus.forwardedToPanol;
+			case "panol_requested_compras":
+				return MaintenanceWorkflowStatus.panolRequestedCompras;
+			case "compras_oc_notified":
+				return MaintenanceWorkflowStatus.comprasOcNotified;
+			case "compras_arrived_notified":
+				return MaintenanceWorkflowStatus.comprasArrivedNotified;
 			case "completed":
 				return MaintenanceWorkflowStatus.completed;
 			case "cancelled":
@@ -39,6 +48,12 @@ enum MaintenanceWorkflowStatus {
 				return "supervisor_stock_ok";
 			case MaintenanceWorkflowStatus.forwardedToPanol:
 				return "forwarded_to_panol";
+			case MaintenanceWorkflowStatus.panolRequestedCompras:
+				return "panol_requested_compras";
+			case MaintenanceWorkflowStatus.comprasOcNotified:
+				return "compras_oc_notified";
+			case MaintenanceWorkflowStatus.comprasArrivedNotified:
+				return "compras_arrived_notified";
 			case MaintenanceWorkflowStatus.completed:
 				return "completed";
 			case MaintenanceWorkflowStatus.cancelled:
@@ -64,6 +79,7 @@ class MaintenanceOrder {
 		this.imagenUrl,
 		this.updatedAt,
 		this.createdBy,
+		this.stockItemId,
 	});
 
 	final String id;
@@ -91,6 +107,9 @@ class MaintenanceOrder {
 	/// Autor del pedido (`created_by` en Supabase); necesario para notificaciones.
 	final String? createdBy;
 
+	/// Línea de inventario descontada al confirmar retiro con stock (`stock_item_id` en BD).
+	final String? stockItemId;
+
 	/// Badge genérico según flujo.
 	MaintenanceOrderStatus get estado {
 		switch (workflowStatus) {
@@ -99,6 +118,10 @@ class MaintenanceOrder {
 			case MaintenanceWorkflowStatus.supervisorStockOk:
 				return MaintenanceOrderStatus.enProceso;
 			case MaintenanceWorkflowStatus.forwardedToPanol:
+				return MaintenanceOrderStatus.enviado;
+			case MaintenanceWorkflowStatus.panolRequestedCompras:
+			case MaintenanceWorkflowStatus.comprasOcNotified:
+			case MaintenanceWorkflowStatus.comprasArrivedNotified:
 				return MaintenanceOrderStatus.enviado;
 			case MaintenanceWorkflowStatus.completed:
 				return MaintenanceOrderStatus.completado;
@@ -138,9 +161,10 @@ class MaintenanceOrder {
 			productType: m["product_type"] as String,
 			priority: m["priority"] as String,
 			destination: m["destination"] as String,
-			imagenUrl: null,
+			imagenUrl: m["imagen_url"] as String?,
 			updatedAt: updatedAt,
 			createdBy: m["created_by"]?.toString(),
+			stockItemId: m["stock_item_id"]?.toString(),
 		);
 	}
 
@@ -156,6 +180,7 @@ class MaintenanceOrder {
 		MaintenanceWorkflowStatus? workflowStatus,
 		DateTime? updatedAt,
 		String? createdBy,
+		String? stockItemId,
 	}) {
 		return MaintenanceOrder(
 			id: id,
@@ -172,6 +197,7 @@ class MaintenanceOrder {
 			imagenUrl: imagenUrl,
 			updatedAt: updatedAt ?? this.updatedAt,
 			createdBy: createdBy ?? this.createdBy,
+			stockItemId: stockItemId ?? this.stockItemId,
 		);
 	}
 }

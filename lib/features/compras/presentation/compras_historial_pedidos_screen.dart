@@ -1,14 +1,34 @@
 import "dart:math" as math;
 
 import "package:flutter/material.dart";
+import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "widgets/compras_pagination_bar.dart";
 import "widgets/compras_screen_metrics.dart";
+import "../application/compras_in_app_notifications_provider.dart";
+import "../application/compras_panol_stock_requests_provider.dart";
+import "../application/compras_stock_repository_provider.dart";
+import "../domain/compras_panol_stock_request_row.dart";
+import "../../orders/application/mantenimiento_notificaciones_provider.dart";
+import "../../orders/application/mis_pedidos_mantenimiento_provider.dart";
+import "../../panol/application/panol_forwarded_orders_provider.dart";
+import "../../supervisor/application/supervisor_maintenance_history_provider.dart";
 
 enum _PrioridadPedido { alta, media, baja }
+
+_PrioridadPedido _prioridadPedidoDesdeString(String raw) {
+	final p = raw.trim().toLowerCase();
+	if (p.contains("alta") || p == "a" || p == "1") {
+		return _PrioridadPedido.alta;
+	}
+	if (p.contains("baja") || p == "c" || p == "3") {
+		return _PrioridadPedido.baja;
+	}
+	return _PrioridadPedido.media;
+}
 
 /// Progreso del aviso por pedido: OC emitida → llegada a planta.
 enum _EstadoAvisoPedido {
@@ -31,6 +51,8 @@ class _SolicitudCompraRow {
 		this.codigoInterno,
 		this.unidadMedida = "unid.",
 		this.imagenUrl,
+		this.maintenanceOrderId,
+		this.workflowStatusDb,
 	});
 
 	final String numeroOrden;
@@ -45,19 +67,41 @@ class _SolicitudCompraRow {
 	final String unidadMedida;
 	/// URL pública del ítem (opcional); si viene vacía no se muestra bloque de imagen.
 	final String? imagenUrl;
+	final String? maintenanceOrderId;
+	final String? workflowStatusDb;
+
+	factory _SolicitudCompraRow.fromPanolRequest(ComprasPanolStockRequestRow r) {
+		final img = r.imagenUrl?.trim();
+		return _SolicitudCompraRow(
+			numeroOrden: r.orderNumber,
+			producto: r.productName,
+			cantidad: r.quantity,
+			prioridad: _prioridadPedidoDesdeString(r.priority),
+			fecha: r.createdAt,
+			sectorSolicitante: r.destination,
+			solicitante: r.solicitanteDisplay,
+			observaciones:
+					"Solicitud enviada desde pañol por falta de stock en depósito.",
+			codigoInterno: null,
+			unidadMedida: "unid.",
+			imagenUrl: (img != null && img.isNotEmpty) ? img : null,
+			maintenanceOrderId: r.maintenanceOrderId,
+			workflowStatusDb: r.maintenanceWorkflowStatus,
+		);
+	}
 }
 
-/// Listado de pedidos solicitados por otros sectores; **Aviso** notifica emisión de OC.
-class ComprasHistorialPedidosScreen extends StatefulWidget {
+/// Historial de solicitudes enviadas desde pañol por falta de stock (orden más reciente primero).
+class ComprasHistorialPedidosScreen extends ConsumerStatefulWidget {
 	const ComprasHistorialPedidosScreen({super.key});
 
 	@override
-	State<ComprasHistorialPedidosScreen> createState() =>
+	ConsumerState<ComprasHistorialPedidosScreen> createState() =>
 			_ComprasHistorialPedidosScreenState();
 }
 
 class _ComprasHistorialPedidosScreenState
-		extends State<ComprasHistorialPedidosScreen> {
+		extends ConsumerState<ComprasHistorialPedidosScreen> {
 	final _buscarCtrl = TextEditingController();
 	_PrioridadPedido? _filtroPrioridad;
 	int _paginaActual = 0;
@@ -65,69 +109,31 @@ class _ComprasHistorialPedidosScreenState
 
 	final Map<String, _EstadoAvisoPedido> _estadoAvisoPorOrden = {};
 
-	_EstadoAvisoPedido _estadoAviso(_SolicitudCompraRow row) =>
-			_estadoAvisoPorOrden[row.numeroOrden] ?? _EstadoAvisoPedido.pendiente;
-
-	static final List<String> _productosDemo = [
-		"Filtro de aire",
-		"Aceite hidráulico",
-		"Rodamiento 6205",
-		"Casco seguridad",
-		"Guantes nitrilo L",
-		"Cable flexible 2,5 mm²",
-		"Grasa litio EP2",
-		"Llave allen 10 mm",
-		"Perno hexagonal M16",
-		"Chaleco reflectivo XL",
-	];
-
-	static final List<String> _sectoresDemo = [
-		"Producción — Línea 2",
-		"Mantenimiento",
-		"Taller mecánico",
-		"Higiene y seguridad",
-		"Laboratorio",
-		"Instalaciones",
-	];
-
-	static final List<String> _solicitantesDemo = [
-		"María González",
-		"Carlos Ruiz",
-		"Ana Ferreyra",
-		"Lucía Pérez",
-		"Diego Martín",
-		"Fernando Costa",
-	];
-
-	static List<_SolicitudCompraRow> _generarDemo() {
-		final out = <_SolicitudCompraRow>[];
-		const prioridades = [
-			_PrioridadPedido.alta,
-			_PrioridadPedido.media,
-			_PrioridadPedido.baja,
-		];
-		const unidades = ["unid.", "L", "m", "kg", "par"];
-		for (var i = 0; i < 60; i++) {
-			final base = DateTime(2026, 5, 12).subtract(Duration(days: i % 55));
-			out.add(
-				_SolicitudCompraRow(
-					numeroOrden: "OC-${(i + 1).toString().padLeft(4, "0")}",
-					producto: _productosDemo[i % _productosDemo.length],
-					cantidad: 5 + (i % 40),
-					prioridad: prioridades[i % prioridades.length],
-					fecha: base,
-					sectorSolicitante: _sectoresDemo[i % _sectoresDemo.length],
-					solicitante: _solicitantesDemo[i % _solicitantesDemo.length],
-					observaciones: i % 4 == 0 ? "Observación de ejemplo para el ítem $i." : null,
-					codigoInterno: i % 3 == 0 ? "MAT-DEMO-${(i % 100).toString().padLeft(3, "0")}" : null,
-					unidadMedida: unidades[i % unidades.length],
-					imagenUrl: i % 5 == 0
-							? "https://picsum.photos/seed/sika_ped$i/640/400"
-							: null,
-				),
-			);
+	_EstadoAvisoPedido _estadoAviso(_SolicitudCompraRow row) {
+		final ws = row.workflowStatusDb;
+		if (ws != null) {
+			switch (ws) {
+				case "panol_requested_compras":
+					return _EstadoAvisoPedido.pendiente;
+				case "compras_oc_notified":
+					return _EstadoAvisoPedido.ordenEmitidaAvisada;
+				case "compras_arrived_notified":
+					return _EstadoAvisoPedido.enPlanta;
+				default:
+					break;
+			}
 		}
-		return out;
+		return _estadoAvisoPorOrden[row.numeroOrden] ?? _EstadoAvisoPedido.pendiente;
+	}
+
+	@override
+	void initState() {
+		super.initState();
+		WidgetsBinding.instance.addPostFrameCallback((_) async {
+			await ref.read(comprasStockRepositoryProvider).markAllPanolStockNotificationsRead();
+			if (!mounted) return;
+			ref.invalidate(comprasInAppNotificationsProvider);
+		});
 	}
 
 	@override
@@ -150,6 +156,15 @@ class _ComprasHistorialPedidosScreenState
 					(r.codigoInterno?.toLowerCase().contains(q) ?? false) ||
 					(r.observaciones?.toLowerCase().contains(q) ?? false);
 		}).toList();
+	}
+
+	void _popHistorial() {
+		if (!context.mounted) return;
+		if (context.canPop()) {
+			context.pop();
+		} else {
+			context.go("/home");
+		}
 	}
 
 	String _fmtFecha(DateTime d) {
@@ -223,7 +238,34 @@ class _ComprasHistorialPedidosScreenState
 		);
 	}
 
-	void _onPasoAviso(_SolicitudCompraRow row) {
+	Future<void> _onPasoAviso(_SolicitudCompraRow row) async {
+		final oid = row.maintenanceOrderId;
+		final ws = row.workflowStatusDb;
+		if (oid != null && ws != null) {
+			try {
+				final repo = ref.read(comprasStockRepositoryProvider);
+				if (ws == "panol_requested_compras") {
+					await repo.comprasNotifyOcEmitted(oid);
+					if (mounted) _mostrarSnackOrdenEmitida(row);
+				} else if (ws == "compras_oc_notified") {
+					await repo.comprasNotifyMaterialArrived(oid);
+					if (mounted) _mostrarSnackLlegadaPlanta(row);
+				}
+				ref.invalidate(comprasPanolStockRequestsProvider);
+				ref.invalidate(comprasInAppNotificationsProvider);
+				ref.invalidate(mantenimientoNotificacionesProvider);
+				ref.invalidate(panolForwardedOrdersProvider);
+				ref.invalidate(supervisorMaintenanceHistoryProvider);
+				ref.invalidate(misPedidosMantenimientoProvider);
+				if (mounted) setState(() {});
+			} catch (e) {
+				if (!mounted) return;
+				ScaffoldMessenger.of(context).showSnackBar(
+					SnackBar(content: Text("No se pudo registrar el aviso: $e")),
+				);
+			}
+			return;
+		}
 		final key = row.numeroOrden;
 		final actual = _estadoAviso(row);
 		if (actual == _EstadoAvisoPedido.pendiente) {
@@ -654,8 +696,8 @@ class _ComprasHistorialPedidosScreenState
 		switch (estado) {
 			case _EstadoAvisoPedido.pendiente:
 				return FilledButton.icon(
-					onPressed: () {
-						_onPasoAviso(row);
+					onPressed: () async {
+						await _onPasoAviso(row);
 						onAfter?.call();
 					},
 					icon: const Icon(Icons.campaign, size: 22, color: Colors.black87),
@@ -666,8 +708,8 @@ class _ComprasHistorialPedidosScreenState
 				);
 			case _EstadoAvisoPedido.ordenEmitidaAvisada:
 				return FilledButton.icon(
-					onPressed: () {
-						_onPasoAviso(row);
+					onPressed: () async {
+						await _onPasoAviso(row);
 						onAfter?.call();
 					},
 					icon: const Icon(Icons.inventory_2, size: 22, color: Colors.white),
@@ -888,15 +930,67 @@ class _ComprasHistorialPedidosScreenState
 
 	@override
 	Widget build(BuildContext context) {
-		final todos = _generarDemo();
+		return ref.watch(comprasPanolStockRequestsProvider).when(
+			data: (rows) {
+				final todos = rows
+						.map((r) => _SolicitudCompraRow.fromPanolRequest(r))
+						.toList();
+				return _scaffoldHistorial(context, todos);
+			},
+			loading: () => Scaffold(
+				backgroundColor: AppTokens.surfacePage,
+				body: Column(
+					crossAxisAlignment: CrossAxisAlignment.stretch,
+					children: [
+						StockScreenHeader(
+							title: "HISTORIAL DE PEDIDOS",
+							onBack: _popHistorial,
+						),
+						const Expanded(
+							child: Center(child: CircularProgressIndicator()),
+						),
+					],
+				),
+			),
+			error: (e, _) => Scaffold(
+				backgroundColor: AppTokens.surfacePage,
+				body: Column(
+					crossAxisAlignment: CrossAxisAlignment.stretch,
+					children: [
+						StockScreenHeader(
+							title: "HISTORIAL DE PEDIDOS",
+							onBack: _popHistorial,
+						),
+						Expanded(
+							child: Center(
+								child: Padding(
+									padding: const EdgeInsets.all(24),
+									child: Text(
+										"No se pudo cargar el historial.\n$e",
+										textAlign: TextAlign.center,
+										style: TextStyle(color: Colors.grey.shade800),
+									),
+								),
+							),
+						),
+					],
+				),
+			),
+		);
+	}
+
+	Widget _scaffoldHistorial(BuildContext context, List<_SolicitudCompraRow> todos) {
 		final filtrados = _filtrar(todos);
 		final totalPaginas = filtrados.isEmpty
-			? 1
-			: (filtrados.length / _itemsPorPagina).ceil().clamp(1, 999);
+				? 1
+				: (filtrados.length / _itemsPorPagina).ceil().clamp(1, 999);
 		final paginaSegura =
-			totalPaginas <= 1 ? 0 : _paginaActual.clamp(0, totalPaginas - 1);
+				totalPaginas <= 1 ? 0 : _paginaActual.clamp(0, totalPaginas - 1);
 		final inicio = paginaSegura * _itemsPorPagina;
 		final paginaItems = filtrados.skip(inicio).take(_itemsPorPagina).toList();
+		final emptyMsg = todos.isEmpty
+				? "Todavía no hay solicitudes desde pañol."
+				: "No hay pedidos con la búsqueda o filtros actuales.";
 
 		return Scaffold(
 			backgroundColor: AppTokens.surfacePage,
@@ -905,13 +999,7 @@ class _ComprasHistorialPedidosScreenState
 				children: [
 					StockScreenHeader(
 						title: "HISTORIAL DE PEDIDOS",
-						onBack: () {
-							if (context.canPop()) {
-								context.pop();
-							} else {
-								context.go("/home");
-							}
-						},
+						onBack: _popHistorial,
 					),
 					Padding(
 						padding: ComprasScreenMetrics.horizontalPadding(context).copyWith(
@@ -983,54 +1071,54 @@ class _ComprasHistorialPedidosScreenState
 					),
 					Expanded(
 						child: filtrados.isEmpty
-							? Center(
-									child: Text(
-										"No hay pedidos con la búsqueda o filtros actuales.",
-										style: TextStyle(color: Colors.grey.shade600),
-									),
-								)
-							: LayoutBuilder(
-									builder: (context, constraints) {
-										final wide =
-												ComprasScreenMetrics.useWideTableFromConstraints(
-													constraints.maxWidth,
+								? Center(
+										child: Text(
+											emptyMsg,
+											style: TextStyle(color: Colors.grey.shade600),
+										),
+									)
+								: LayoutBuilder(
+										builder: (context, constraints) {
+											final wide =
+													ComprasScreenMetrics.useWideTableFromConstraints(
+														constraints.maxWidth,
+													);
+											final pad =
+													ComprasScreenMetrics.horizontalPadding(context);
+											if (!wide) {
+												return ListView.separated(
+													padding: EdgeInsets.fromLTRB(
+														pad.left,
+														8,
+														pad.right,
+														16,
+													),
+													itemCount: paginaItems.length,
+													separatorBuilder: (_, __) =>
+															const SizedBox(height: 12),
+													itemBuilder: (ctx, i) =>
+															_pedidoCardMovil(paginaItems[i]),
 												);
-										final pad =
-												ComprasScreenMetrics.horizontalPadding(context);
-										if (!wide) {
-											return ListView.separated(
-												padding: EdgeInsets.fromLTRB(
-													pad.left,
-													8,
-													pad.right,
-													16,
-												),
-												itemCount: paginaItems.length,
-												separatorBuilder: (_, __) =>
-														const SizedBox(height: 12),
-												itemBuilder: (ctx, i) =>
-														_pedidoCardMovil(paginaItems[i]),
-											);
-										}
-										return Scrollbar(
-											child: SingleChildScrollView(
-												padding: EdgeInsets.fromLTRB(
-													pad.left,
-													0,
-													pad.right,
-													16,
-												),
-												child: _tablaPedidosDesktop(
-													paginaItems,
-													math.max(
-														0.0,
-														constraints.maxWidth - pad.horizontal,
+											}
+											return Scrollbar(
+												child: SingleChildScrollView(
+													padding: EdgeInsets.fromLTRB(
+														pad.left,
+														0,
+														pad.right,
+														16,
+													),
+													child: _tablaPedidosDesktop(
+														paginaItems,
+														math.max(
+															0.0,
+															constraints.maxWidth - pad.horizontal,
+														),
 													),
 												),
-											),
-										);
-									},
-								),
+											);
+										},
+									),
 					),
 					if (filtrados.isNotEmpty && totalPaginas > 1)
 						ComprasPaginationBar(

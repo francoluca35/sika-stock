@@ -98,12 +98,13 @@ class SupervisorHomeScreen extends ConsumerWidget {
 													),
 												),
 												leading: const _LeadingIconBadge(
-													icon: Icons.add_shopping_cart_outlined,
+													icon: Icons.checklist_outlined,
 													iconColor: Colors.black87,
 												),
-												title: "HACER PEDIDO",
-												subtitle: "Solicitar materiales o repuestos",
-												onTap: () => context.push("/pedidos/nuevo"),
+												title: "ELEGIR PRODUCTO",
+												subtitle:
+														"Ver stock en catálogo: confirmar retiro con pañol o derivar si no hay",
+												onTap: () => context.push("/supervisor/elegir-producto-retiro"),
 											),
 											const SizedBox(height: 12),
 											_SupervisorMenuCard(
