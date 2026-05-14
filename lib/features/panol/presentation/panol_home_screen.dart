@@ -5,7 +5,6 @@ import "package:go_router/go_router.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
-import "../../supervisor/application/maintenance_orders_realtime_provider.dart";
 
 /// Pantalla inicial **Pañol**: solo accesos; cada uno abre su propia pantalla.
 class PanolHomeScreen extends ConsumerWidget {
@@ -13,7 +12,6 @@ class PanolHomeScreen extends ConsumerWidget {
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
-		ref.watch(maintenanceOrdersRealtimeTickProvider);
 		return Scaffold(
 			backgroundColor: AppTokens.surfacePage,
 			body: Column(

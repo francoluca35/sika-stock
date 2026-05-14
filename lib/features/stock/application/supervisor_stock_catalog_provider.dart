@@ -1,7 +1,5 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
-import "../../../core/realtime/realtime_refresh.dart";
-import "../../../core/realtime/stock_realtime_tick_provider.dart";
 import "../../auth/application/auth_providers.dart";
 import "../data/stock_catalog_repository.dart";
 import "../domain/stock_product.dart";
@@ -19,12 +17,6 @@ final supervisorStockCatalogProvider =
 class SupervisorStockCatalogNotifier extends AsyncNotifier<List<StockProduct>> {
 	@override
 	Future<List<StockProduct>> build() async {
-		bindRealtimeTickRefresh(
-			ref,
-			stockRealtimeTickProvider,
-			() => refresh(),
-		);
-		ref.watch(stockRealtimeTickProvider);
 		return ref.read(stockCatalogRepositoryProvider).fetchAll();
 	}
 

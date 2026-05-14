@@ -5,21 +5,16 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../notifications/local_notification_service.dart";
 import "../../features/auth/application/auth_providers.dart";
-import "../../features/auth/application/auth_session_provider.dart";
 import "../../features/auth/domain/app_role.dart";
-import "../../features/compras/application/compras_flow_realtime_tick_provider.dart";
 import "../../features/compras/application/compras_in_app_notifications_provider.dart";
 import "../../features/compras/domain/compras_in_app_notification_row.dart";
 import "../../features/orders/application/mantenimiento_notificaciones_provider.dart";
-import "../../features/orders/application/mis_pedidos_mantenimiento_provider.dart";
 import "../../features/panol/application/panol_forwarded_orders_provider.dart";
 import "../../features/supervisor/application/maintenance_orders_provider.dart";
-import "../../features/supervisor/application/maintenance_orders_realtime_provider.dart";
 import "../../features/supervisor/domain/maintenance_order.dart";
 import "../../features/supervisor/domain/maintenance_order_notification_row.dart";
-import "stock_realtime_tick_provider.dart";
 
-/// Mantiene activos Realtime y alertas mientras hay sesión.
+/// Envuelve la app sin polling ni recargas periódicas (solo streams Realtime).
 class AppRealtimeShell extends ConsumerWidget {
 	const AppRealtimeShell({super.key, required this.child});
 
@@ -27,28 +22,27 @@ class AppRealtimeShell extends ConsumerWidget {
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
-		final session = ref.watch(authSessionProvider);
-		if (session != null) {
-			ref.watch(maintenanceOrdersRealtimeTickProvider);
-			ref.watch(comprasFlowRealtimeTickProvider);
-			ref.watch(stockRealtimeTickProvider);
-		}
-		return LiveNotificationHost(child: child);
+		return Stack(
+			fit: StackFit.expand,
+			children: [
+				child,
+				const _LiveNotificationListener(),
+			],
+		);
 	}
 }
 
-/// SnackBar en app + notificación en barra del sistema (móvil).
-class LiveNotificationHost extends ConsumerStatefulWidget {
-	const LiveNotificationHost({super.key, required this.child});
-
-	final Widget child;
+/// Escucha notificaciones sin reconstruir el árbol principal de la app.
+class _LiveNotificationListener extends ConsumerStatefulWidget {
+	const _LiveNotificationListener();
 
 	@override
-	ConsumerState<LiveNotificationHost> createState() =>
-			_LiveNotificationHostState();
+	ConsumerState<_LiveNotificationListener> createState() =>
+			_LiveNotificationListenerState();
 }
 
-class _LiveNotificationHostState extends ConsumerState<LiveNotificationHost> {
+class _LiveNotificationListenerState
+		extends ConsumerState<_LiveNotificationListener> {
 	final Set<String> _seenMaintNotifIds = {};
 	final Set<String> _seenComprasNotifIds = {};
 	final Set<String> _seenSupervisorOrderIds = {};
@@ -183,11 +177,6 @@ class _LiveNotificationHostState extends ConsumerState<LiveNotificationHost> {
 		ref.listen(panolForwardedOrdersProvider, (prev, next) {
 			next.whenData(_onPanolOrders);
 		});
-		ref.watch(mantenimientoNotificacionesProvider);
-		ref.watch(comprasInAppNotificationsProvider);
-		ref.watch(maintenanceOrdersProvider);
-		ref.watch(misPedidosMantenimientoProvider);
-		ref.watch(panolForwardedOrdersProvider);
-		return widget.child;
+		return const SizedBox.shrink();
 	}
 }

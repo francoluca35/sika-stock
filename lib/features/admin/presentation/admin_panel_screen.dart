@@ -6,7 +6,6 @@ import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
 import "../../supervisor/application/maintenance_orders_provider.dart";
-import "../../supervisor/application/maintenance_orders_realtime_provider.dart";
 import "widgets/admin_shell_bottom_bar.dart";
 
 /// Panel principal ADMIN / SUPERADMIN según mockups (desktop 3×2, mobile lista).
@@ -40,7 +39,6 @@ class AdminPanelScreen extends ConsumerWidget {
 
 		return profileAsync.when(
 			data: (p) {
-				ref.watch(maintenanceOrdersRealtimeTickProvider);
 				final welcome = _welcomeName(p);
 				final bottomInset = MediaQuery.paddingOf(context).bottom;
 				final pedidosMantenimientoPendientes =

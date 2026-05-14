@@ -4,7 +4,6 @@ import "package:go_router/go_router.dart";
 
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
-import "../../supervisor/application/maintenance_orders_realtime_provider.dart";
 import "widgets/maintenance_notifications_block.dart";
 import "widgets/order_hub_bottom_bar.dart";
 
@@ -20,7 +19,6 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
-		ref.watch(maintenanceOrdersRealtimeTickProvider);
 		final bottomInset = MediaQuery.paddingOf(context).bottom;
 
 		return Scaffold(

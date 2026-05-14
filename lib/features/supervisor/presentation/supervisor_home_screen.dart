@@ -8,7 +8,6 @@ import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
 import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
 import "../application/maintenance_orders_provider.dart";
-import "../application/maintenance_orders_realtime_provider.dart";
 
 /// Pantalla inicial **Supervisor**: accesos rápidos a pedidos, stock y seguimiento.
 class SupervisorHomeScreen extends ConsumerWidget {
@@ -42,7 +41,6 @@ class SupervisorHomeScreen extends ConsumerWidget {
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
-		ref.watch(maintenanceOrdersRealtimeTickProvider);
 		final profileAsync = ref.watch(currentProfileProvider);
 
 		return profileAsync.when(
