@@ -1,11 +1,31 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
+import "../../auth/application/auth_providers.dart";
+import "../../auth/application/auth_session_provider.dart";
 import "../domain/compras_in_app_notification_row.dart";
-import "compras_flow_realtime_tick_provider.dart";
-import "compras_stock_repository_provider.dart";
 
+/// Notificaciones in-app de Compras (stream Realtime).
 final comprasInAppNotificationsProvider =
-		FutureProvider.autoDispose<List<ComprasInAppNotificationRow>>((ref) async {
-	ref.watch(comprasFlowRealtimeTickProvider);
-	return ref.read(comprasStockRepositoryProvider).fetchMyNotifications();
+		StreamProvider<List<ComprasInAppNotificationRow>>((ref) {
+	ref.keepAlive();
+	final session = ref.watch(authSessionProvider);
+	if (session == null) {
+		return Stream.value(const []);
+	}
+	final uid = session.user.id;
+	final client = ref.watch(supabaseClientProvider);
+	return client
+			.from("compras_in_app_notifications")
+			.stream(primaryKey: ["id"])
+			.eq("user_id", uid)
+			.order("created_at", ascending: false)
+			.map(
+				(rows) => rows
+						.map(
+							(m) => ComprasInAppNotificationRow.fromJson(
+								Map<String, dynamic>.from(m),
+							),
+						)
+						.toList(),
+			);
 });

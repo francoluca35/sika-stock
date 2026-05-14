@@ -1,8 +1,8 @@
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
-import "package:intl/intl.dart";
 
+import "../../../core/format/argentina_datetime.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
@@ -14,8 +14,8 @@ import "../domain/maintenance_order.dart";
 class SupervisorMaintenanceHistoryScreen extends ConsumerStatefulWidget {
 	const SupervisorMaintenanceHistoryScreen({super.key});
 
-	static final DateFormat _fechaFmt = DateFormat("dd/MM/yyyy HH:mm");
-	static final DateFormat _soloFecha = DateFormat("dd/MM/yyyy");
+	static String _formatFechaHora(DateTime d) => ArgentinaDateTime.formatDateTime(d);
+	static String _formatSoloFecha(DateTime d) => ArgentinaDateTime.formatDateOnly(d);
 
 	@override
 	ConsumerState<SupervisorMaintenanceHistoryScreen> createState() =>
@@ -121,7 +121,7 @@ class _SupervisorMaintenanceHistoryScreenState
 				crossAxisAlignment: CrossAxisAlignment.stretch,
 				children: [
 					StockScreenHeader(
-						title: "HISTORIAL DE PEDIDOS",
+						title: "HISTORIAL MANTENIMIENTO",
 						onBack: () {
 							if (context.canPop()) {
 								context.pop();
@@ -219,7 +219,7 @@ class _SupervisorMaintenanceHistoryScreenState
 																label: Text(
 																	_desde == null
 																			? "Fecha desde"
-																			: "Desde: ${SupervisorMaintenanceHistoryScreen._soloFecha.format(_desde!)}",
+																			: "Desde: ${SupervisorMaintenanceHistoryScreen._formatSoloFecha(_desde!)}",
 																),
 															),
 															OutlinedButton.icon(
@@ -228,7 +228,7 @@ class _SupervisorMaintenanceHistoryScreenState
 																label: Text(
 																	_hasta == null
 																			? "Fecha hasta"
-																			: "Hasta: ${SupervisorMaintenanceHistoryScreen._soloFecha.format(_hasta!)}",
+																			: "Hasta: ${SupervisorMaintenanceHistoryScreen._formatSoloFecha(_hasta!)}",
 																),
 															),
 															TextButton(
@@ -346,6 +346,8 @@ class _HistorialPedidoCard extends StatelessWidget {
 				return "Solicitud enviada a compras: $fechaFmt";
 			case MaintenanceWorkflowStatus.comprasOcNotified:
 				return "En consulta — OC emitida (Compras): $fechaFmt";
+			case MaintenanceWorkflowStatus.comprasPurchaseDone:
+				return "Compra realizada: $fechaFmt";
 			case MaintenanceWorkflowStatus.comprasArrivedNotified:
 				return "Material en planta: $fechaFmt";
 			default:
@@ -363,6 +365,7 @@ class _HistorialPedidoCard extends StatelessWidget {
 			MaintenanceWorkflowStatus.forwardedToPanol ||
 			MaintenanceWorkflowStatus.panolRequestedCompras ||
 			MaintenanceWorkflowStatus.comprasOcNotified ||
+			MaintenanceWorkflowStatus.comprasPurchaseDone ||
 			MaintenanceWorkflowStatus.comprasArrivedNotified =>
 				true,
 			_ => false,
@@ -390,7 +393,7 @@ class _HistorialPedidoCard extends StatelessWidget {
 			secundario = Colors.grey.shade800;
 		}
 
-		final fechaFmt = SupervisorMaintenanceHistoryScreen._fechaFmt.format(record.fechaCierre);
+		final fechaFmt = SupervisorMaintenanceHistoryScreen._formatFechaHora(record.fechaCierre);
 		final fechaLinea = esEntregado
 				? "Entregado: $fechaFmt"
 				: esFlujoConsultaCompras
@@ -481,7 +484,7 @@ class _HistorialPedidoCard extends StatelessWidget {
 							),
 							const SizedBox(height: 4),
 							Text(
-								"Pedido: ${SupervisorMaintenanceHistoryScreen._fechaFmt.format(o.fechaPedido)}",
+								"Pedido: ${SupervisorMaintenanceHistoryScreen._formatFechaHora(o.fechaPedido)}",
 								style: TextStyle(
 									fontSize: 12,
 									color: secundario.withValues(alpha: 0.9),

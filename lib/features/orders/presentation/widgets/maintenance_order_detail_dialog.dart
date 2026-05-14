@@ -1,6 +1,6 @@
 import "package:flutter/material.dart";
-import "package:intl/intl.dart";
 
+import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../supervisor/domain/maintenance_order.dart";
 
@@ -10,7 +10,6 @@ void showMaintenanceOrderDetalleDialog(
 	MaintenanceOrder order, {
 	int? stockCatalogoCantidad,
 }) {
-	final fmt = DateFormat("dd/MM/yyyy HH:mm");
 	showDialog<void>(
 		context: context,
 		builder: (ctx) => AlertDialog(
@@ -29,7 +28,10 @@ void showMaintenanceOrderDetalleDialog(
 							),
 						),
 						const SizedBox(height: 14),
-						_DetalleFila(label: "Fecha", valor: fmt.format(order.fechaPedido)),
+						_DetalleFila(
+							label: "Fecha",
+							valor: ArgentinaDateTime.formatDateTime(order.fechaPedido),
+						),
 						_DetalleFila(label: "Producto", valor: order.producto),
 						_DetalleFila(label: "Cantidad", valor: "${order.quantity} u."),
 						_DetalleFila(label: "Tipo", valor: order.productType),
@@ -104,6 +106,8 @@ String _workflowLabel(MaintenanceWorkflowStatus w) {
 			return "En compras (solicitado por pañol)";
 		case MaintenanceWorkflowStatus.comprasOcNotified:
 			return "OC emitida por compras";
+		case MaintenanceWorkflowStatus.comprasPurchaseDone:
+			return "Compra realizada";
 		case MaintenanceWorkflowStatus.comprasArrivedNotified:
 			return "Material en planta";
 		case MaintenanceWorkflowStatus.completed:

@@ -20,6 +20,8 @@ String _estadoMantenimientoTexto(MaintenanceWorkflowStatus w) {
 			return "En pañol — pedido a compras (seguimiento)";
 		case MaintenanceWorkflowStatus.comprasOcNotified:
 			return "Consulta — OC emitida (compras)";
+		case MaintenanceWorkflowStatus.comprasPurchaseDone:
+			return "Compra realizada — en tránsito / espera planta";
 		case MaintenanceWorkflowStatus.comprasArrivedNotified:
 			return "Material en planta — coordinar retiro";
 		case MaintenanceWorkflowStatus.completed:

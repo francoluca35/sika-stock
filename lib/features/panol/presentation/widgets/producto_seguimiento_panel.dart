@@ -2,8 +2,7 @@ import "dart:math" as math;
 
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
-import "package:intl/intl.dart";
-
+import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../compras/application/compras_stock_repository_provider.dart";
 import "../../../compras/presentation/widgets/compras_screen_metrics.dart";
@@ -56,7 +55,7 @@ class ProductoSeguimiento {
 	final List<SeguimientoEvento> trayecto;
 
 	bool get puedeAvisarLlegada =>
-			workflowStatus == "compras_oc_notified" &&
+			workflowStatus == "compras_purchase_done" &&
 			maintenanceOrderId != null &&
 			maintenanceOrderId!.isNotEmpty;
 }
@@ -83,9 +82,7 @@ String _etiquetaEstado(SeguimientoCompraEstado e) {
 	}
 }
 
-String _fmtFechaHora(DateTime d) {
-	return DateFormat("dd/MM/yyyy HH:mm").format(d);
-}
+String _fmtFechaHora(DateTime d) => ArgentinaDateTime.formatDateTime(d);
 
 /// Listado dinámico: color por estado; al tocar un ítem se abre el detalle del trayecto.
 class ProductoSeguimientoPanel extends ConsumerWidget {

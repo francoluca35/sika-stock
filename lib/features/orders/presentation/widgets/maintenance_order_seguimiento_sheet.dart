@@ -1,12 +1,11 @@
 import "package:flutter/material.dart";
-import "package:intl/intl.dart";
 
+import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../supervisor/domain/maintenance_order.dart";
 
 /// Muestra el **seguimiento** del pedido (estados y texto operativo).
 void showMaintenanceOrderSeguimientoSheet(BuildContext context, MaintenanceOrder o) {
-	final fmt = DateFormat("dd/MM/yyyy HH:mm");
 	showModalBottomSheet<void>(
 		context: context,
 		isScrollControlled: true,
@@ -17,7 +16,7 @@ void showMaintenanceOrderSeguimientoSheet(BuildContext context, MaintenanceOrder
 		),
 		builder: (ctx) {
 			final bottom = MediaQuery.paddingOf(ctx).bottom;
-			final lineas = _seguimientoLineas(o, fmt);
+			final lineas = _seguimientoLineas(o);
 			return Padding(
 				padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottom),
 				child: SingleChildScrollView(
@@ -98,9 +97,9 @@ void showMaintenanceOrderSeguimientoSheet(BuildContext context, MaintenanceOrder
 	);
 }
 
-List<String> _seguimientoLineas(MaintenanceOrder o, DateFormat fmt) {
+List<String> _seguimientoLineas(MaintenanceOrder o) {
 	final out = <String>[];
-	final alta = fmt.format(o.fechaPedido);
+	final alta = ArgentinaDateTime.formatDateTime(o.fechaPedido);
 	out.add("Pedido registrado ($alta): ${o.producto} · ${o.quantity} u. · ${o.destination}");
 
 	switch (o.workflowStatus) {
@@ -115,7 +114,7 @@ List<String> _seguimientoLineas(MaintenanceOrder o, DateFormat fmt) {
 			);
 			if (o.stockItemId != null && o.stockItemId!.isNotEmpty) {
 				out.add(
-					"Inventario: se descontaron ${o.quantity} u. del ítem asociado al confirmar el retiro.",
+					"Inventario: se descontaron ${o.quantity} u. del ítem asociado al confirmar stock.",
 				);
 			} else {
 				out.add(
@@ -138,7 +137,12 @@ List<String> _seguimientoLineas(MaintenanceOrder o, DateFormat fmt) {
 			break;
 		case MaintenanceWorkflowStatus.comprasOcNotified:
 			out.add(
-				"Compras notificó orden de compra emitida; el pedido queda en consulta organizacional.",
+				"Compras notificó orden de compra / pre-aprobación emitida.",
+			);
+			break;
+		case MaintenanceWorkflowStatus.comprasPurchaseDone:
+			out.add(
+				"Compras confirmó que la compra fue realizada.",
 			);
 			break;
 		case MaintenanceWorkflowStatus.comprasArrivedNotified:
@@ -152,7 +156,7 @@ List<String> _seguimientoLineas(MaintenanceOrder o, DateFormat fmt) {
 			);
 			if (o.stockItemId != null && o.stockItemId!.isNotEmpty) {
 				out.add(
-					"En su momento se descontaron ${o.quantity} u. del inventario al confirmar stock.",
+					"Se descontaron ${o.quantity} u. del inventario al confirmar stock o al cerrar el retiro.",
 				);
 			}
 			break;

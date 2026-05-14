@@ -1,8 +1,8 @@
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
-import "package:intl/intl.dart";
 
+import "../../../core/format/argentina_datetime.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../panol/application/panol_forwarded_orders_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
@@ -20,7 +20,7 @@ class SupervisorMaintenanceOrdersScreen extends ConsumerStatefulWidget {
   /// Por debajo de este ancho se muestran tarjetas (sin scroll horizontal).
   static const double _tableLayoutMinWidth = 760;
 
-  static final DateFormat _fechaFmt = DateFormat("dd/MM/yyyy HH:mm");
+  static String _formatFecha(DateTime d) => ArgentinaDateTime.formatDateTime(d);
 
   static String _workflowBadgeLabel(MaintenanceOrder o) {
     switch (o.workflowStatus) {
@@ -34,6 +34,8 @@ class SupervisorMaintenanceOrdersScreen extends ConsumerStatefulWidget {
         return "EN COMPRAS";
       case MaintenanceWorkflowStatus.comprasOcNotified:
         return "CONSULTA OC";
+      case MaintenanceWorkflowStatus.comprasPurchaseDone:
+        return "COMPRA HECHA";
       case MaintenanceWorkflowStatus.comprasArrivedNotified:
         return "EN PLANTA";
       case MaintenanceWorkflowStatus.completed:
@@ -55,6 +57,8 @@ class SupervisorMaintenanceOrdersScreen extends ConsumerStatefulWidget {
         return (Colors.amber.shade700, Colors.black87);
       case MaintenanceWorkflowStatus.comprasOcNotified:
         return (AppTokens.roleMantenimientoBg, Colors.white);
+      case MaintenanceWorkflowStatus.comprasPurchaseDone:
+        return (Colors.deepOrange.shade700, Colors.white);
       case MaintenanceWorkflowStatus.comprasArrivedNotified:
         return (AppTokens.statusOk, Colors.white);
       case MaintenanceWorkflowStatus.completed:
@@ -295,7 +299,7 @@ class _SupervisorMaintenanceOrdersScreenState
                 ),
                 _DetailRow(
                   label: "Cuándo se pidió",
-                  value: SupervisorMaintenanceOrdersScreen._fechaFmt.format(
+                  value: SupervisorMaintenanceOrdersScreen._formatFecha(
                     o.fechaPedido,
                   ),
                 ),
@@ -674,8 +678,8 @@ class _SupervisorMaintenanceOrdersScreenState
         SnackBar(
           content: Text(
             hayStock
-                ? "Stock confirmado: listo para retiro (se descontará al registrar la entrega)."
-                : "Derivado a pañol (sin stock según catálogo).",
+                ? "Stock confirmado: se descontó del inventario. Mantenimiento y pañol fueron notificados."
+                : "Derivado a pañol: mantenimiento y pañol fueron notificados.",
           ),
         ),
       );
@@ -896,8 +900,7 @@ class _SupervisorMaintenanceOrdersScreenState
                                             SupervisorMaintenanceOrdersScreen
                                                 ._celdaTexto(
                                               SupervisorMaintenanceOrdersScreen
-                                                  ._fechaFmt
-                                                  .format(fila.fechaPedido),
+                                                  ._formatFecha(fila.fechaPedido),
                                             ),
                                             SupervisorMaintenanceOrdersScreen
                                                 ._celdaTexto(fila.producto),
@@ -1074,8 +1077,8 @@ class _SupervisorMaintenanceOrdersScreenState
                                 index: index,
                                 order: o,
                                 fechaText:
-                                    SupervisorMaintenanceOrdersScreen._fechaFmt
-                                        .format(o.fechaPedido),
+                                SupervisorMaintenanceOrdersScreen._formatFecha(
+                                    o.fechaPedido),
                                 estadoLabel:
                                     SupervisorMaintenanceOrdersScreen
                                         ._workflowBadgeLabel(o),

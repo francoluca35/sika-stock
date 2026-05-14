@@ -31,7 +31,9 @@ _EstadoPedidoPanol _panolBadgeDesdeWorkflow(MaintenanceWorkflowStatus w) {
 		case MaintenanceWorkflowStatus.panolRequestedCompras:
 			return _EstadoPedidoPanol.enTramiteCompras;
 		case MaintenanceWorkflowStatus.comprasOcNotified:
-			return _EstadoPedidoPanol.consultaMantenimiento;
+			return _EstadoPedidoPanol.enTramiteCompras;
+		case MaintenanceWorkflowStatus.comprasPurchaseDone:
+			return _EstadoPedidoPanol.enTramiteCompras;
 		case MaintenanceWorkflowStatus.comprasArrivedNotified:
 			return _EstadoPedidoPanol.materialEnPlanta;
 		case MaintenanceWorkflowStatus.supervisorStockOk:
@@ -841,6 +843,7 @@ class _PanolPedidosActions extends StatelessWidget {
 				wf != MaintenanceWorkflowStatus.forwardedToPanol &&
 				(wf == MaintenanceWorkflowStatus.panolRequestedCompras ||
 						wf == MaintenanceWorkflowStatus.comprasOcNotified ||
+						wf == MaintenanceWorkflowStatus.comprasPurchaseDone ||
 						wf == MaintenanceWorkflowStatus.comprasArrivedNotified);
 		final mostrarSeguimientoExtra =
 				onSeguimiento != null && !seguimientoCompras;
