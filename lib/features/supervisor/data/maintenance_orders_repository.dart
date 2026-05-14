@@ -70,6 +70,7 @@ class MaintenanceOrdersRepository {
 					"forwarded_to_panol",
 					"panol_requested_compras",
 					"compras_oc_notified",
+					"compras_purchase_done",
 					"compras_arrived_notified",
 					"cancelled",
 				])
@@ -98,6 +99,7 @@ class MaintenanceOrdersRepository {
 					"forwarded_to_panol",
 					"panol_requested_compras",
 					"compras_oc_notified",
+					"compras_purchase_done",
 					"compras_arrived_notified",
 					"supervisor_stock_ok",
 				])

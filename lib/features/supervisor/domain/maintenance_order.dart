@@ -13,6 +13,7 @@ enum MaintenanceWorkflowStatus {
 	forwardedToPanol,
 	panolRequestedCompras,
 	comprasOcNotified,
+	comprasPurchaseDone,
 	comprasArrivedNotified,
 	completed,
 	cancelled;
@@ -29,6 +30,8 @@ enum MaintenanceWorkflowStatus {
 				return MaintenanceWorkflowStatus.panolRequestedCompras;
 			case "compras_oc_notified":
 				return MaintenanceWorkflowStatus.comprasOcNotified;
+			case "compras_purchase_done":
+				return MaintenanceWorkflowStatus.comprasPurchaseDone;
 			case "compras_arrived_notified":
 				return MaintenanceWorkflowStatus.comprasArrivedNotified;
 			case "completed":
@@ -52,6 +55,8 @@ enum MaintenanceWorkflowStatus {
 				return "panol_requested_compras";
 			case MaintenanceWorkflowStatus.comprasOcNotified:
 				return "compras_oc_notified";
+			case MaintenanceWorkflowStatus.comprasPurchaseDone:
+				return "compras_purchase_done";
 			case MaintenanceWorkflowStatus.comprasArrivedNotified:
 				return "compras_arrived_notified";
 			case MaintenanceWorkflowStatus.completed:
@@ -121,6 +126,7 @@ class MaintenanceOrder {
 				return MaintenanceOrderStatus.enviado;
 			case MaintenanceWorkflowStatus.panolRequestedCompras:
 			case MaintenanceWorkflowStatus.comprasOcNotified:
+			case MaintenanceWorkflowStatus.comprasPurchaseDone:
 			case MaintenanceWorkflowStatus.comprasArrivedNotified:
 				return MaintenanceOrderStatus.enviado;
 			case MaintenanceWorkflowStatus.completed:
@@ -132,20 +138,17 @@ class MaintenanceOrder {
 
 	factory MaintenanceOrder.fromJson(Map<String, dynamic> m) {
 		final created = m["created_at"];
-		DateTime fecha;
-		if (created is DateTime) {
-			fecha = created;
-		} else {
-			fecha = DateTime.parse(created.toString());
-		}
+		final DateTime fecha = switch (created) {
+			DateTime d => d.toUtc(),
+			_ => DateTime.parse(created.toString()).toUtc(),
+		};
 		final rawUpd = m["updated_at"];
 		DateTime? updatedAt;
 		if (rawUpd != null) {
-			if (rawUpd is DateTime) {
-				updatedAt = rawUpd;
-			} else {
-				updatedAt = DateTime.tryParse(rawUpd.toString());
-			}
+			updatedAt = switch (rawUpd) {
+				DateTime d => d.toUtc(),
+				_ => DateTime.tryParse(rawUpd.toString())?.toUtc(),
+			};
 		}
 		return MaintenanceOrder(
 			id: m["id"] as String,

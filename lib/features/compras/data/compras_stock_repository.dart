@@ -92,7 +92,7 @@ class ComprasStockRepository {
 		});
 	}
 
-	/// Compras: registra que se emitió la OC (notifica a pañol, supervisor, admin y solicitante).
+	/// Compras: registra que se emitió la OC / pre-aprobación.
 	Future<void> comprasNotifyOcEmitted(String maintenanceOrderId) async {
 		await _client
 				.from("maintenance_orders")
@@ -101,12 +101,21 @@ class ComprasStockRepository {
 				.eq("workflow_status", "panol_requested_compras");
 	}
 
-	/// Compras o Pañol: confirma llegada del material a planta (notifica a todos los roles).
+	/// Compras: registra que la compra fue realizada.
+	Future<void> comprasNotifyPurchaseDone(String maintenanceOrderId) async {
+		await _client
+				.from("maintenance_orders")
+				.update({"workflow_status": "compras_purchase_done"})
+				.eq("id", maintenanceOrderId)
+				.eq("workflow_status", "compras_oc_notified");
+	}
+
+	/// Compras o Pañol: confirma llegada del material a planta.
 	Future<void> comprasNotifyMaterialArrived(String maintenanceOrderId) async {
 		await _client
 				.from("maintenance_orders")
 				.update({"workflow_status": "compras_arrived_notified"})
 				.eq("id", maintenanceOrderId)
-				.eq("workflow_status", "compras_oc_notified");
+				.eq("workflow_status", "compras_purchase_done");
 	}
 }

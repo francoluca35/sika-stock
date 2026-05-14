@@ -4,6 +4,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:supabase_flutter/supabase_flutter.dart";
 
 import "../../auth/application/auth_providers.dart";
+import "../../auth/application/auth_session_provider.dart";
 
 /// Contador que incrementa ante cambios Realtime en pedidos o notificaciones del flujo mantenimiento.
 ///
@@ -26,6 +27,11 @@ class MaintenanceOrdersRealtimeTickNotifier extends Notifier<int> {
 	@override
 	int build() {
 		ref.keepAlive();
+		final session = ref.watch(authSessionProvider);
+		if (session == null) {
+			_unsubscribe();
+			return 0;
+		}
 		final client = ref.watch(supabaseClientProvider);
 		_unsubscribe();
 		_channel = client.channel(

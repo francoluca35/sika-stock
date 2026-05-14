@@ -5,6 +5,7 @@ import "../presentation/widgets/producto_seguimiento_panel.dart";
 const _workflowSeguimientoCompras = {
 	"panol_requested_compras",
 	"compras_oc_notified",
+	"compras_purchase_done",
 	"compras_arrived_notified",
 };
 
@@ -12,8 +13,10 @@ SeguimientoCompraEstado seguimientoEstadoDesdeWorkflow(String? ws) {
 	switch (ws) {
 		case "compras_arrived_notified":
 			return SeguimientoCompraEstado.entregado;
-		case "compras_oc_notified":
+		case "compras_purchase_done":
 			return SeguimientoCompraEstado.comprado;
+		case "compras_oc_notified":
+			return SeguimientoCompraEstado.pendienteCompra;
 		default:
 			return SeguimientoCompraEstado.pendienteCompra;
 	}
@@ -48,11 +51,23 @@ ProductoSeguimiento productoSeguimientoDesdeComprasRequest(
 	);
 
 	if (ws == "compras_oc_notified" ||
+			ws == "compras_purchase_done" ||
 			ws == "compras_arrived_notified" ||
 			ws == "completed") {
 		trayecto.add(
 			SeguimientoEvento(
 				titulo: "Compras emitió orden de compra",
+				cuando: r.maintenanceUpdatedAt ?? r.createdAt,
+			),
+		);
+	}
+
+	if (ws == "compras_purchase_done" ||
+			ws == "compras_arrived_notified" ||
+			ws == "completed") {
+		trayecto.add(
+			SeguimientoEvento(
+				titulo: "Compra realizada",
 				cuando: r.maintenanceUpdatedAt ?? r.createdAt,
 			),
 		);

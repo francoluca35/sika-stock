@@ -1,8 +1,8 @@
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
-import "package:intl/intl.dart";
 
+import "../../../core/format/argentina_datetime.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
@@ -14,7 +14,7 @@ import "../application/panol_order_history_provider.dart";
 class PanolPedidosHistorialScreen extends ConsumerStatefulWidget {
 	const PanolPedidosHistorialScreen({super.key});
 
-	static final DateFormat _fechaFmt = DateFormat("dd/MM/yyyy HH:mm");
+	static String _formatFechaHora(DateTime d) => ArgentinaDateTime.formatDateTime(d);
 
 	@override
 	ConsumerState<PanolPedidosHistorialScreen> createState() =>
@@ -218,7 +218,7 @@ class _PanolHistorialCard extends StatelessWidget {
 							),
 							const SizedBox(height: 8),
 							Text(
-								"${PanolPedidosHistorialScreen._fechaFmt.format(record.fechaCierre)} · ${o.producto}",
+								"${PanolPedidosHistorialScreen._formatFechaHora(record.fechaCierre)} · ${o.producto}",
 								style: TextStyle(
 									fontSize: 13,
 									color: Colors.grey.shade800,

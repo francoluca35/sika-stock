@@ -122,8 +122,14 @@ class MaintenanceNotificationsBlock extends ConsumerWidget {
 																			color: switch (n.kind) {
 																				"stock_ok_retiro" =>
 																						const Color(0xFF1B5E20),
+																				"panol_atento_retiro" =>
+																						const Color(0xFF1B5E20),
 																				"panol_stock_externo" =>
 																						const Color(0xFF1B5E20),
+																				"enviado_a_compras" =>
+																						Colors.orange.shade900,
+																				"compra_realizada" =>
+																						Colors.deepOrange.shade900,
 																				"oc_emitida_compras" =>
 																						Colors.indigo.shade900,
 																				"material_llego_planta" =>

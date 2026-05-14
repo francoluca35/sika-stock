@@ -30,10 +30,11 @@ _PrioridadPedido _prioridadPedidoDesdeString(String raw) {
 	return _PrioridadPedido.media;
 }
 
-/// Progreso del aviso por pedido: OC emitida → llegada a planta.
+/// Progreso del aviso por pedido: OC → compra realizada → llegada a planta.
 enum _EstadoAvisoPedido {
 	pendiente,
-	ordenEmitidaAvisada,
+	ocEmitida,
+	compraRealizada,
 	enPlanta,
 }
 
@@ -116,7 +117,9 @@ class _ComprasHistorialPedidosScreenState
 				case "panol_requested_compras":
 					return _EstadoAvisoPedido.pendiente;
 				case "compras_oc_notified":
-					return _EstadoAvisoPedido.ordenEmitidaAvisada;
+					return _EstadoAvisoPedido.ocEmitida;
+				case "compras_purchase_done":
+					return _EstadoAvisoPedido.compraRealizada;
 				case "compras_arrived_notified":
 					return _EstadoAvisoPedido.enPlanta;
 				default:
@@ -222,6 +225,22 @@ class _ComprasHistorialPedidosScreenState
 		);
 	}
 
+	void _mostrarSnackCompraRealizada(_SolicitudCompraRow row) {
+		if (!mounted) return;
+		ScaffoldMessenger.of(context).showSnackBar(
+			SnackBar(
+				content: Text(
+					"Compra realizada registrada: ${row.numeroOrden} · ${row.producto}.",
+				),
+				action: SnackBarAction(
+					label: "OK",
+					textColor: AppTokens.yellowAccent,
+					onPressed: () {},
+				),
+			),
+		);
+	}
+
 	void _mostrarSnackLlegadaPlanta(_SolicitudCompraRow row) {
 		if (!mounted) return;
 		ScaffoldMessenger.of(context).showSnackBar(
@@ -248,6 +267,9 @@ class _ComprasHistorialPedidosScreenState
 					await repo.comprasNotifyOcEmitted(oid);
 					if (mounted) _mostrarSnackOrdenEmitida(row);
 				} else if (ws == "compras_oc_notified") {
+					await repo.comprasNotifyPurchaseDone(oid);
+					if (mounted) _mostrarSnackCompraRealizada(row);
+				} else if (ws == "compras_purchase_done") {
 					await repo.comprasNotifyMaterialArrived(oid);
 					if (mounted) _mostrarSnackLlegadaPlanta(row);
 				}
@@ -270,12 +292,19 @@ class _ComprasHistorialPedidosScreenState
 		final actual = _estadoAviso(row);
 		if (actual == _EstadoAvisoPedido.pendiente) {
 			setState(() {
-				_estadoAvisoPorOrden[key] = _EstadoAvisoPedido.ordenEmitidaAvisada;
+				_estadoAvisoPorOrden[key] = _EstadoAvisoPedido.ocEmitida;
 			});
 			_mostrarSnackOrdenEmitida(row);
 			return;
 		}
-		if (actual == _EstadoAvisoPedido.ordenEmitidaAvisada) {
+		if (actual == _EstadoAvisoPedido.ocEmitida) {
+			setState(() {
+				_estadoAvisoPorOrden[key] = _EstadoAvisoPedido.compraRealizada;
+			});
+			_mostrarSnackCompraRealizada(row);
+			return;
+		}
+		if (actual == _EstadoAvisoPedido.compraRealizada) {
 			setState(() {
 				_estadoAvisoPorOrden[key] = _EstadoAvisoPedido.enPlanta;
 			});
@@ -286,9 +315,11 @@ class _ComprasHistorialPedidosScreenState
 	String _estadoAvisoDetalleText(_SolicitudCompraRow row) {
 		switch (_estadoAviso(row)) {
 			case _EstadoAvisoPedido.pendiente:
-				return "Pendiente: aún no se envió aviso de OC emitida.";
-			case _EstadoAvisoPedido.ordenEmitidaAvisada:
-				return "Aviso enviado: OC emitida. Pendiente aviso de llegada a planta (Compras o Pañol).";
+				return "Pendiente: emitir aviso de OC / pre-aprobación.";
+			case _EstadoAvisoPedido.ocEmitida:
+				return "OC emitida. Pendiente registrar compra realizada.";
+			case _EstadoAvisoPedido.compraRealizada:
+				return "Compra realizada. Pendiente aviso de llegada a planta (Compras o Pañol).";
 			case _EstadoAvisoPedido.enPlanta:
 				return "Material registrado en planta.";
 		}
@@ -701,19 +732,31 @@ class _ComprasHistorialPedidosScreenState
 						onAfter?.call();
 					},
 					icon: const Icon(Icons.campaign, size: 22, color: Colors.black87),
-					label: const Text("Aviso"),
+					label: const Text("OC emitida"),
 					style: compact
 							? _styleAvisoTabla(AppTokens.yellowHeader, Colors.black87)
 							: _styleAvisoCard(AppTokens.yellowHeader, Colors.black87),
 				);
-			case _EstadoAvisoPedido.ordenEmitidaAvisada:
+			case _EstadoAvisoPedido.ocEmitida:
+				return FilledButton.icon(
+					onPressed: () async {
+						await _onPasoAviso(row);
+						onAfter?.call();
+					},
+					icon: const Icon(Icons.shopping_cart_checkout, size: 22, color: Colors.black87),
+					label: const Text("Compra realizada"),
+					style: compact
+							? _styleAvisoTabla(AppTokens.yellowHeader, Colors.black87)
+							: _styleAvisoCard(AppTokens.yellowHeader, Colors.black87),
+				);
+			case _EstadoAvisoPedido.compraRealizada:
 				return FilledButton.icon(
 					onPressed: () async {
 						await _onPasoAviso(row);
 						onAfter?.call();
 					},
 					icon: const Icon(Icons.inventory_2, size: 22, color: Colors.white),
-					label: const Text("Avisar llegada"),
+					label: const Text("En planta"),
 					style: compact
 							? _styleAvisoTabla(AppTokens.statusOk, Colors.white)
 							: _styleAvisoCard(AppTokens.statusOk, Colors.white),

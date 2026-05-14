@@ -24,6 +24,7 @@ dependencies:
   printing: ^5.14.3
   qr_flutter: ^4.1.0
   supabase_flutter: ^2.12.4
+  timezone: ^0.10.1
   web: ^1.1.1
 
 dev_dependencies:
@@ -31,9 +32,24 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
   shared_preferences: ^2.5.3
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon_launcher.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icon_launcher.png"
+  min_sdk_android: 23
+  web:
+    generate: true
+    image_path: "assets/icon_launcher.png"
+    background_color: "#000000"
+    theme_color: "#E30613"
 
 flutter:
   uses-material-design: true
   assets:
     - .env
     - assets/sika.png
+    - assets/icon_launcher.png

@@ -144,17 +144,21 @@ class SupervisorHomeScreen extends ConsumerWidget {
 											),
 											const SizedBox(height: 12),
 											_SupervisorMenuCard(
-												leadingDecoration: BoxDecoration(
-													color: AppTokens.blackNav,
-													borderRadius: BorderRadius.circular(12),
+												leadingDecoration: const BoxDecoration(
+													color: AppTokens.whiteSurface,
+													borderRadius: BorderRadius.all(Radius.circular(12)),
+													border: Border.fromBorderSide(
+														BorderSide(color: Colors.black87, width: 1.5),
+													),
 												),
 												leading: const Icon(
-													Icons.history,
-													color: Colors.white,
+													Icons.history_edu_outlined,
+													color: Colors.black87,
 													size: 28,
 												),
-												title: "HISTORIAL DE PEDIDOS",
-												subtitle: "Ver pedidos realizados",
+												title: "HISTORIAL MANTENIMIENTO",
+												subtitle:
+														"Entregados, consulta pañol y cancelados",
 												onTap: () =>
 														context.push("/supervisor/historial-pedidos"),
 											),

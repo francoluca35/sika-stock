@@ -4,6 +4,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:supabase_flutter/supabase_flutter.dart";
 
 import "../../auth/application/auth_providers.dart";
+import "../../auth/application/auth_session_provider.dart";
 
 /// Incrementa ante cambios Realtime en solicitudes Pañol→Compras y notificaciones Compras.
 final comprasFlowRealtimeTickProvider =
@@ -24,6 +25,11 @@ class ComprasFlowRealtimeTickNotifier extends Notifier<int> {
 	@override
 	int build() {
 		ref.keepAlive();
+		final session = ref.watch(authSessionProvider);
+		if (session == null) {
+			_unsubscribe();
+			return 0;
+		}
 		final client = ref.watch(supabaseClientProvider);
 		_unsubscribe();
 		_channel = client.channel(

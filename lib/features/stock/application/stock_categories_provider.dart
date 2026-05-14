@@ -1,5 +1,7 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
+import "../../../core/realtime/realtime_refresh.dart";
+import "../../../core/realtime/stock_realtime_tick_provider.dart";
 import "../../auth/application/auth_providers.dart";
 import "../data/stock_categories_repository.dart";
 import "../domain/stock_category.dart";
@@ -17,6 +19,12 @@ final stockCategoriesProvider =
 class StockCategoriesNotifier extends AsyncNotifier<List<StockCategory>> {
 	@override
 	Future<List<StockCategory>> build() async {
+		bindRealtimeTickRefresh(
+			ref,
+			stockRealtimeTickProvider,
+			() => refresh(),
+		);
+		ref.watch(stockRealtimeTickProvider);
 		return ref.read(stockCategoriesRepositoryProvider).fetchAll();
 	}
 

@@ -23,6 +23,7 @@ class CompletedMaintenanceRecord {
 			MaintenanceWorkflowStatus.forwardedToPanol => "Consulta con pañol",
 			MaintenanceWorkflowStatus.panolRequestedCompras => "Seguimiento con compras",
 			MaintenanceWorkflowStatus.comprasOcNotified => "Consulta (OC emitida)",
+			MaintenanceWorkflowStatus.comprasPurchaseDone => "Compra realizada",
 			MaintenanceWorkflowStatus.comprasArrivedNotified => "Material en planta",
 			MaintenanceWorkflowStatus.cancelled => "Cancelado",
 			_ => "Cerrado",
