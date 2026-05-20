@@ -3,7 +3,9 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "../../../core/format/argentina_datetime.dart";
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
+import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../panol/application/panol_forwarded_orders_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
@@ -490,17 +492,26 @@ class _SupervisorMaintenanceOrdersScreenState
                                   ),
                                   onPressed: () async {
                                     Navigator.of(ctx).pop();
-                                    await _decidirStock(
-                                      context,
-                                      o,
-                                      hayStock: analisis.haySuficiente,
-                                      stockItemId: analisis.haySuficiente
-                                          ? analisis.match?.id
-                                          : null,
-                                    );
+                                    if (analisis.haySuficiente &&
+                                        analisis.match != null) {
+                                      await _confirmarRetiroOk(
+                                        context,
+                                        o,
+                                        catalog,
+                                      );
+                                    } else {
+                                      await _decidirStock(
+                                        context,
+                                        o,
+                                        hayStock: false,
+                                      );
+                                    }
                                   },
                                   child: Text(
-                                    analisis.haySuficiente ? "RETIRO OK" : "A PAÑOL",
+                                    analisis.haySuficiente &&
+                                            analisis.match != null
+                                        ? "RETIRO OK"
+                                        : "A PAÑOL",
                                     style: const TextStyle(fontWeight: FontWeight.w800),
                                   ),
                                 ),
@@ -554,11 +565,13 @@ class _SupervisorMaintenanceOrdersScreenState
             foreground: Colors.black87,
             onPressed: () => _elegirProductoCatalogo(context, o, catalog),
           ),
-          if (analisis.haySuficiente) ...[
+          if (analisis.haySuficiente && analisis.match != null) ...[
             Padding(
               padding: const EdgeInsets.only(top: 2, right: 6),
               child: Text(
-                "Catálogo OK",
+                _catalogOverrideByOrderId.containsKey(o.id)
+                    ? "Línea elegida: ${analisis.match!.nombre}"
+                    : "Catálogo OK",
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -570,14 +583,9 @@ class _SupervisorMaintenanceOrdersScreenState
               label: "RETIRO OK",
               background: AppTokens.statusOk,
               foreground: Colors.white,
-              onPressed: () => _decidirStock(
-                    context,
-                    o,
-                    hayStock: true,
-                    stockItemId: analisis.match?.id,
-                  ),
+              onPressed: () => _confirmarRetiroOk(context, o, catalog),
             ),
-          ] else ...[
+          ] else if (!analisis.haySuficiente) ...[
             Padding(
               padding: const EdgeInsets.only(top: 2, right: 4),
               child: ConstrainedBox(
@@ -602,45 +610,67 @@ class _SupervisorMaintenanceOrdersScreenState
               foreground: Colors.white,
               onPressed: () => _decidirStock(context, o, hayStock: false),
             ),
-          ],
+          ] else if (analisis.haySuficiente && analisis.match == null)
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 4),
+              child: Text(
+                "Usá ELEGIR y RETIRO OK",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange.shade900,
+                ),
+              ),
+            ),
         ],
         if (o.workflowStatus ==
-            MaintenanceWorkflowStatus.supervisorStockOk)
+                MaintenanceWorkflowStatus.supervisorStockOk ||
+            o.workflowStatus ==
+                MaintenanceWorkflowStatus.comprasArrivedNotified)
           _TextActionButton(
-            label: "RETIRAR",
-            background: AppTokens.redAction,
+            label: "RETIRO OK",
+            background: AppTokens.statusOk,
             foreground: Colors.white,
-            onPressed: () => _retirarDesdeStock(context, o),
-          ),
-        if (o.workflowStatus ==
-            MaintenanceWorkflowStatus.comprasArrivedNotified)
-          _TextActionButton(
-            label: "COMPLETAR",
-            background: AppTokens.blackNav,
-            foreground: Colors.white,
-            onPressed: () => _retirarDesdeStock(context, o),
+            onPressed: () => _confirmarRetiroOk(context, o, catalog),
           ),
       ],
     );
   }
 
-  Future<void> _retirarDesdeStock(BuildContext context, MaintenanceOrder o) async {
+  Future<void> _confirmarRetiroOk(
+    BuildContext context,
+    MaintenanceOrder o,
+    List<StockProduct> catalog,
+  ) async {
+    final analisis = _analisisParaOrden(o, catalog);
+    final stockId = o.workflowStatus ==
+            MaintenanceWorkflowStatus.pendingSupervisor
+        ? analisis.match?.id
+        : o.stockItemId;
     try {
-      await ref.read(maintenanceOrdersProvider.notifier).registrarRetiro(o.id);
+      await ref.read(maintenanceOrdersProvider.notifier).confirmarRetiroOk(
+            order: o,
+            stockItemId: stockId,
+          );
+      if (!mounted) return;
+      setState(() => _catalogOverrideByOrderId.remove(o.id));
       if (!context.mounted) return;
+      final desconto =
+          stockId != null && stockId.isNotEmpty;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            o.stockItemId != null && o.stockItemId!.isNotEmpty
-                ? "Retiro registrado. ${o.numeroOrden}: se descontaron ${o.quantity} u. del inventario."
-                : "Retiro registrado. ${o.numeroOrden} pasó al historial.",
+            desconto
+                ? "RETIRO OK: ${o.numeroOrden} · pañol y mantenimiento avisados; "
+                    "en historial; se descontaron ${o.quantity} u."
+                : "RETIRO OK: ${o.numeroOrden} · pañol y mantenimiento avisados; en historial.",
           ),
         ),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("No se pudo registrar el retiro: $e")),
+        SnackBar(content: Text("No se pudo confirmar RETIRO OK: $e")),
       );
     }
   }
@@ -677,9 +707,7 @@ class _SupervisorMaintenanceOrdersScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            hayStock
-                ? "Stock confirmado: se descontó del inventario. Mantenimiento y pañol fueron notificados."
-                : "Derivado a pañol: mantenimiento y pañol fueron notificados.",
+            "Derivado a pañol: pañol fue notificado.",
           ),
         ),
       );
@@ -709,7 +737,11 @@ class _SupervisorMaintenanceOrdersScreenState
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PedidosMantenimientoBar(onBack: () => _onBack(context)),
+            StockScreenHeader(
+              title: "PEDIDOS DE MANTENIMIENTO",
+              onBack: () => _onBack(context),
+              onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
+            ),
             const Expanded(
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -721,7 +753,11 @@ class _SupervisorMaintenanceOrdersScreenState
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PedidosMantenimientoBar(onBack: () => _onBack(context)),
+            StockScreenHeader(
+              title: "PEDIDOS DE MANTENIMIENTO",
+              onBack: () => _onBack(context),
+              onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
+            ),
             Expanded(
               child: Center(
                 child: Padding(
@@ -744,8 +780,10 @@ class _SupervisorMaintenanceOrdersScreenState
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _PedidosMantenimientoBar(
+                StockScreenHeader(
+                  title: "PEDIDOS DE MANTENIMIENTO",
                   onBack: () => _onBack(context),
+                  onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
                 ),
                 const Expanded(
                   child: Center(child: CircularProgressIndicator()),
@@ -758,8 +796,10 @@ class _SupervisorMaintenanceOrdersScreenState
             body: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _PedidosMantenimientoBar(
+                StockScreenHeader(
+                  title: "PEDIDOS DE MANTENIMIENTO",
                   onBack: () => _onBack(context),
+                  onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
                 ),
                 Expanded(
                   child: Center(
@@ -795,8 +835,10 @@ class _SupervisorMaintenanceOrdersScreenState
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _PedidosMantenimientoBar(
+          StockScreenHeader(
+            title: "PEDIDOS DE MANTENIMIENTO",
             onBack: () => _onBack(context),
+            onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
           ),
           Expanded(
             child: Padding(
@@ -959,21 +1001,22 @@ class _SupervisorMaintenanceOrdersScreenState
                                                         catalog,
                                                       ),
                                                     ),
-                                                    if (analisis.haySuficiente)
+                                                    if (analisis.haySuficiente &&
+                                                        analisis.match != null)
                                                       _TextActionButton(
                                                         label: "RETIRO OK",
                                                         background:
                                                             AppTokens.statusOk,
                                                         foreground: Colors.white,
                                                         onPressed: () =>
-                                                            _decidirStock(
+                                                            _confirmarRetiroOk(
                                                           context,
                                                           fila,
-                                                          hayStock: true,
-                                                          stockItemId: analisis.match?.id,
+                                                          catalog,
                                                         ),
                                                       )
-                                                    else
+                                                    else if (!analisis
+                                                        .haySuficiente)
                                                       _TextActionButton(
                                                         label: "A PAÑOL",
                                                         background: Colors
@@ -988,31 +1031,21 @@ class _SupervisorMaintenanceOrdersScreenState
                                                       ),
                                                   ],
                                                   if (fila.workflowStatus ==
-                                                      MaintenanceWorkflowStatus
-                                                          .supervisorStockOk)
+                                                          MaintenanceWorkflowStatus
+                                                              .supervisorStockOk ||
+                                                      fila.workflowStatus ==
+                                                          MaintenanceWorkflowStatus
+                                                              .comprasArrivedNotified)
                                                     _TextActionButton(
-                                                      label: "RETIRAR",
+                                                      label: "RETIRO OK",
                                                       background:
-                                                          AppTokens.redAction,
+                                                          AppTokens.statusOk,
                                                       foreground: Colors.white,
                                                       onPressed: () =>
-                                                          _retirarDesdeStock(
+                                                          _confirmarRetiroOk(
                                                         context,
                                                         fila,
-                                                      ),
-                                                    ),
-                                                  if (fila.workflowStatus ==
-                                                      MaintenanceWorkflowStatus
-                                                          .comprasArrivedNotified)
-                                                    _TextActionButton(
-                                                      label: "COMPLETAR",
-                                                      background:
-                                                          AppTokens.blackNav,
-                                                      foreground: Colors.white,
-                                                      onPressed: () =>
-                                                          _retirarDesdeStock(
-                                                        context,
-                                                        fila,
+                                                        catalog,
                                                       ),
                                                     ),
                                                   if (fila.workflowStatus ==
@@ -1121,47 +1154,6 @@ class _SupervisorMaintenanceOrdersScreenState
           },
         );
       },
-    );
-  }
-}
-
-class _PedidosMantenimientoBar extends StatelessWidget {
-  const _PedidosMantenimientoBar({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: AppTokens.yellowHeader,
-      child: SafeArea(
-        bottom: false,
-        child: SizedBox(
-          height: 52,
-          child: Row(
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.black87),
-                onPressed: onBack,
-              ),
-              const Expanded(
-                child: Text(
-                  "PEDIDOS DE MANTENIMIENTO",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 48),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "widgets/maintenance_notifications_block.dart";
@@ -27,6 +28,7 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 				crossAxisAlignment: CrossAxisAlignment.stretch,
 				children: [
 					_MaintenanceHomeHeader(
+						onRefresh: () => ScreenRefresh.mantenimientoHome(ref),
 						onLogout: () async {
 							await ref.read(authRepositoryProvider).signOut();
 						},
@@ -100,8 +102,12 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 }
 
 class _MaintenanceHomeHeader extends StatelessWidget {
-	const _MaintenanceHomeHeader({required this.onLogout});
+	const _MaintenanceHomeHeader({
+		required this.onRefresh,
+		required this.onLogout,
+	});
 
+	final VoidCallback onRefresh;
 	final Future<void> Function() onLogout;
 
 	@override
@@ -126,6 +132,11 @@ class _MaintenanceHomeHeader extends StatelessWidget {
 								),
 							),
 							const Spacer(),
+							IconButton(
+								tooltip: "Recargar",
+								icon: const Icon(Icons.refresh, color: Colors.black87),
+								onPressed: onRefresh,
+							),
 							PopupMenuButton<String>(
 								tooltip: "Cuenta",
 								offset: const Offset(0, 40),

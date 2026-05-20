@@ -18,6 +18,16 @@ class StockCatalogRepository {
 				.toList();
 	}
 
+	Future<StockProduct?> fetchById(String id) async {
+		final row = await _client
+				.from("stock_items")
+				.select(_selectCols)
+				.eq("id", id)
+				.maybeSingle();
+		if (row == null) return null;
+		return StockProduct.fromJson(Map<String, dynamic>.from(row as Map));
+	}
+
 	Future<void> update(StockProduct p) async {
 		await _client.from("stock_items").update({
 			"nombre": p.nombre,

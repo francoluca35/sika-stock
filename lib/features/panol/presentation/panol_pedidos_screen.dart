@@ -4,6 +4,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../application/panol_forwarded_orders_provider.dart";
 import "../application/panol_order_history_provider.dart";
@@ -184,6 +185,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 						StockScreenHeader(
 							title: "PEDIDOS",
 							onBack: () => _back(context),
+							onRefresh: () => ScreenRefresh.pedidosPanol(ref),
 						),
 						const Expanded(
 							child: Center(child: CircularProgressIndicator()),
@@ -199,6 +201,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 						StockScreenHeader(
 							title: "PEDIDOS",
 							onBack: () => _back(context),
+							onRefresh: () => ScreenRefresh.pedidosPanol(ref),
 						),
 						Expanded(
 							child: Center(
@@ -240,6 +243,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 					StockScreenHeader(
 						title: "PEDIDOS",
 						onBack: () => _back(context),
+						onRefresh: () => ScreenRefresh.pedidosPanol(ref),
 					),
 					Expanded(
 						child: Column(

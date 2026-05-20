@@ -4,6 +4,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "widgets/compras_pagination_bar.dart";
@@ -988,6 +989,7 @@ class _ComprasHistorialPedidosScreenState
 						StockScreenHeader(
 							title: "HISTORIAL DE PEDIDOS",
 							onBack: _popHistorial,
+							onRefresh: () => ScreenRefresh.compras(ref),
 						),
 						const Expanded(
 							child: Center(child: CircularProgressIndicator()),
@@ -1003,6 +1005,7 @@ class _ComprasHistorialPedidosScreenState
 						StockScreenHeader(
 							title: "HISTORIAL DE PEDIDOS",
 							onBack: _popHistorial,
+							onRefresh: () => ScreenRefresh.compras(ref),
 						),
 						Expanded(
 							child: Center(
@@ -1043,6 +1046,7 @@ class _ComprasHistorialPedidosScreenState
 					StockScreenHeader(
 						title: "HISTORIAL DE PEDIDOS",
 						onBack: _popHistorial,
+						onRefresh: () => ScreenRefresh.compras(ref),
 					),
 					Padding(
 						padding: ComprasScreenMetrics.horizontalPadding(context).copyWith(

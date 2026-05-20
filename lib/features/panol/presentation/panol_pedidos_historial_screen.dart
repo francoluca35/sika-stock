@@ -3,6 +3,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "../../../core/format/argentina_datetime.dart";
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
@@ -71,6 +72,7 @@ class _PanolPedidosHistorialScreenState extends ConsumerState<PanolPedidosHistor
 					StockScreenHeader(
 						title: "HISTORIAL PEDIDOS",
 						onBack: () => _back(context),
+						onRefresh: () => ScreenRefresh.pedidosPanol(ref),
 					),
 					Padding(
 						padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

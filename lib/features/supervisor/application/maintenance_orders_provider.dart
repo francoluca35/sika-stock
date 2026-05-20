@@ -2,6 +2,8 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../auth/application/auth_providers.dart";
 import "../../auth/application/auth_session_provider.dart";
+import "../../orders/application/mantenimiento_notificaciones_provider.dart";
+import "../../panol/application/panol_forwarded_orders_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../data/maintenance_orders_repository.dart";
 import "../domain/maintenance_order.dart";
@@ -60,7 +62,7 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 		if (hayStock && stockItemId != null && stockItemId.isNotEmpty) {
 			ref.invalidate(supervisorStockCatalogProvider);
 		}
-		ref.invalidate(supervisorMaintenanceHistoryProvider);
+		_afterWorkflowChange();
 	}
 
 	Future<void> supervisorCreateFromCatalogAndDecide({
@@ -87,6 +89,10 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 			hayStock: hayStock,
 			stockItemId: hayStock ? stockItemId : null,
 		);
+		if (hayStock) {
+			await ref.read(maintenanceOrdersRepositoryProvider).markCompleted(id);
+			_afterRetiroInventoryChange();
+		}
 	}
 
 	Future<void> registrarRetiro(String orderId) async {
@@ -95,8 +101,53 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 		final exists = list.any((o) => o.id == orderId);
 		if (!exists) return;
 		await ref.read(maintenanceOrdersRepositoryProvider).markCompleted(orderId);
+		_afterRetiroInventoryChange();
+	}
+
+	/// Un solo RETIRO OK: avisa (supervisor_stock_ok) + historial (completed) + un descuento.
+	Future<void> confirmarRetiroOk({
+		required MaintenanceOrder order,
+		String? stockItemId,
+	}) async {
+		final repo = ref.read(maintenanceOrdersRepositoryProvider);
+		switch (order.workflowStatus) {
+			case MaintenanceWorkflowStatus.pendingSupervisor:
+				final sid = stockItemId?.trim();
+				if (sid == null || sid.isEmpty) {
+					throw Exception(
+						"Elegí una línea del catálogo (ELEGIR) antes de RETIRO OK.",
+					);
+				}
+				await repo.supervisorDecideStock(
+					orderId: order.id,
+					hayStock: true,
+					stockItemId: sid,
+				);
+				await repo.markCompleted(order.id);
+			case MaintenanceWorkflowStatus.supervisorStockOk:
+			case MaintenanceWorkflowStatus.comprasArrivedNotified:
+				await repo.markCompleted(order.id);
+			default:
+				throw Exception("Este pedido no admite RETIRO OK en su estado actual.");
+		}
+		_afterRetiroInventoryChange();
+	}
+
+	void _afterRetiroInventoryChange() {
 		ref.invalidate(supervisorStockCatalogProvider);
+		_afterWorkflowChange();
+	}
+
+	/// Pedido sale de «activos» y el historial debe mostrar el registro nuevo.
+	void _afterWorkflowChange() {
+		ref.invalidate(maintenanceOrdersProvider);
+		ref.read(maintenanceOrdersProvider);
 		ref.invalidate(supervisorMaintenanceHistoryProvider);
+		ref.read(supervisorMaintenanceHistoryProvider);
+		ref.invalidate(panolForwardedOrdersProvider);
+		ref.read(panolForwardedOrdersProvider);
+		ref.invalidate(mantenimientoNotificacionesProvider);
+		ref.read(mantenimientoNotificacionesProvider);
 	}
 }
 

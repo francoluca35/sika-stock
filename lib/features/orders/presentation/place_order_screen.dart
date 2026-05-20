@@ -6,6 +6,7 @@ import "package:go_router/go_router.dart";
 import "package:image_picker/image_picker.dart" show ImagePicker, ImageSource;
 
 import "../../../core/images/order_photo_compress.dart";
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
@@ -221,6 +222,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
                 context.go("/home");
               }
             },
+            onRefresh: () => ScreenRefresh.mantenimientoHome(ref),
           ),
           Expanded(
             child: SingleChildScrollView(
@@ -482,9 +484,13 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 }
 
 class _PlaceOrderHeader extends StatelessWidget {
-  const _PlaceOrderHeader({required this.onBack});
+  const _PlaceOrderHeader({
+    required this.onBack,
+    required this.onRefresh,
+  });
 
   final VoidCallback onBack;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -514,13 +520,25 @@ class _PlaceOrderHeader extends StatelessWidget {
                   onPressed: onBack,
                 ),
               ),
-              const Text(
-                "HACER PEDIDO",
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 17,
-                  letterSpacing: 0.8,
-                  color: Colors.black87,
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 48),
+                child: Text(
+                  "HACER PEDIDO",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17,
+                    letterSpacing: 0.8,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.black87),
+                  tooltip: "Recargar",
+                  onPressed: onRefresh,
                 ),
               ),
             ],

@@ -3,8 +3,10 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "../../../core/format/argentina_datetime.dart";
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
+import "../../orders/presentation/widgets/retiro_producto_detail_sheet.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../application/supervisor_maintenance_history_provider.dart";
 import "../domain/completed_maintenance_record.dart";
@@ -129,6 +131,7 @@ class _SupervisorMaintenanceHistoryScreenState
 								context.go("/home");
 							}
 						},
+						onRefresh: () => ScreenRefresh.historialMantenimiento(ref),
 					),
 					Expanded(
 						child: Align(
@@ -449,6 +452,28 @@ class _HistorialPedidoCard extends StatelessWidget {
 											),
 										),
 									),
+									if (esEntregado) ...[
+										const SizedBox(width: 8),
+										OutlinedButton.icon(
+											onPressed: () => showRetiroProductoDetailSheet(context, o),
+											style: OutlinedButton.styleFrom(
+												foregroundColor: _verdeTexto,
+												side: const BorderSide(color: _verdeBorde, width: 1.4),
+												padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+												minimumSize: Size.zero,
+												tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+											),
+											icon: Icon(Icons.inventory_2_outlined, size: 18, color: _verdeTexto),
+											label: Text(
+												"VER PRODUCTO",
+												style: TextStyle(
+													fontWeight: FontWeight.w800,
+													fontSize: 11,
+													color: _verdeTexto,
+												),
+											),
+										),
+									],
 									if (esFlujoConsultaCompras) ...[
 										const SizedBox(width: 8),
 										OutlinedButton.icon(

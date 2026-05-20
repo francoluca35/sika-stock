@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
@@ -18,6 +19,7 @@ class PanolHomeScreen extends ConsumerWidget {
 				crossAxisAlignment: CrossAxisAlignment.stretch,
 				children: [
 					_PanolHomeHeader(
+						onRefresh: () => ScreenRefresh.panolHome(ref),
 						onLogout: () async {
 							await ref.read(authRepositoryProvider).signOut();
 						},
@@ -117,8 +119,12 @@ class PanolHomeScreen extends ConsumerWidget {
 }
 
 class _PanolHomeHeader extends StatelessWidget {
-	const _PanolHomeHeader({required this.onLogout});
+	const _PanolHomeHeader({
+		required this.onRefresh,
+		required this.onLogout,
+	});
 
+	final VoidCallback onRefresh;
 	final Future<void> Function() onLogout;
 
 	@override
@@ -143,6 +149,11 @@ class _PanolHomeHeader extends StatelessWidget {
 								),
 							),
 							const Spacer(),
+							IconButton(
+								tooltip: "Recargar",
+								icon: const Icon(Icons.refresh, color: Colors.black87),
+								onPressed: onRefresh,
+							),
 							PopupMenuButton<String>(
 								tooltip: "Cuenta",
 								offset: const Offset(0, 40),

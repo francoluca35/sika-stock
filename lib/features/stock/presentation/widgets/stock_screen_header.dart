@@ -2,16 +2,18 @@ import "package:flutter/material.dart";
 
 import "../../../../core/theme/app_tokens.dart";
 
-/// Cabecera amarilla con atrás y título centrado (hub Stock y pantallas hijas).
+/// Cabecera amarilla: atrás, título centrado y recarga manual opcional (⟳).
 class StockScreenHeader extends StatelessWidget {
 	const StockScreenHeader({
 		super.key,
 		required this.title,
 		required this.onBack,
+		this.onRefresh,
 	});
 
 	final String title;
 	final VoidCallback onBack;
+	final VoidCallback? onRefresh;
 
 	@override
 	Widget build(BuildContext context) {
@@ -56,6 +58,15 @@ class StockScreenHeader extends StatelessWidget {
 									),
 								),
 							),
+							if (onRefresh != null)
+								Align(
+									alignment: Alignment.centerRight,
+									child: IconButton(
+										icon: const Icon(Icons.refresh, color: Colors.black87),
+										tooltip: "Recargar",
+										onPressed: onRefresh,
+									),
+								),
 						],
 					),
 				),

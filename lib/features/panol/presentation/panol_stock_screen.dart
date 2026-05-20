@@ -3,6 +3,7 @@ import "package:flutter/services.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
@@ -445,6 +446,7 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 						StockScreenHeader(
 							title: "STOCK",
 							onBack: () => _back(context),
+							onRefresh: () => ScreenRefresh.stock(ref),
 						),
 						const Expanded(
 							child: Center(child: CircularProgressIndicator()),
@@ -460,6 +462,7 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 						StockScreenHeader(
 							title: "STOCK",
 							onBack: () => _back(context),
+							onRefresh: () => ScreenRefresh.stock(ref),
 						),
 						Expanded(
 							child: Center(
@@ -502,6 +505,7 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 					StockScreenHeader(
 						title: "STOCK",
 						onBack: () => _back(context),
+						onRefresh: () => ScreenRefresh.stock(ref),
 					),
 					Padding(
 						padding: EdgeInsets.fromLTRB(compact ? 12 : 16, 8, compact ? 12 : 16, 0),

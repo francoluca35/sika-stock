@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
@@ -68,6 +69,7 @@ class _SupervisorStockScreenState extends ConsumerState<SupervisorStockScreen> {
                   context.go("/home");
                 }
               },
+              onRefresh: () => ScreenRefresh.stock(ref),
             ),
             const Expanded(
               child: Center(child: CircularProgressIndicator()),
@@ -89,6 +91,7 @@ class _SupervisorStockScreenState extends ConsumerState<SupervisorStockScreen> {
                   context.go("/home");
                 }
               },
+              onRefresh: () => ScreenRefresh.stock(ref),
             ),
             Expanded(
               child: Center(
@@ -139,6 +142,7 @@ class _SupervisorStockScreenState extends ConsumerState<SupervisorStockScreen> {
                 context.go("/home");
               }
             },
+            onRefresh: () => ScreenRefresh.stock(ref),
           ),
           Expanded(
             child: Align(

@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
@@ -52,6 +53,7 @@ class AdminPanelScreen extends ConsumerWidget {
 							_AdminYellowHeader(
 								logoAsset: _logoAsset,
 								isMobile: _isCompact(context),
+								onRefresh: () => ScreenRefresh.adminHome(ref),
 								onLogout: () => _signOut(ref),
 								profileLabel: p?.rol?.label.toUpperCase() ?? "ADMIN",
 							),
@@ -163,12 +165,14 @@ class _AdminYellowHeader extends StatelessWidget {
 	const _AdminYellowHeader({
 		required this.logoAsset,
 		required this.isMobile,
+		required this.onRefresh,
 		required this.onLogout,
 		required this.profileLabel,
 	});
 
 	final String logoAsset;
 	final bool isMobile;
+	final VoidCallback onRefresh;
 	final VoidCallback onLogout;
 	final String profileLabel;
 
@@ -206,6 +210,11 @@ class _AdminYellowHeader extends StatelessWidget {
 					semanticLabel: "Logo Sika",
 				),
 				const Spacer(),
+				IconButton(
+					tooltip: "Recargar",
+					icon: const Icon(Icons.refresh, color: Colors.black87),
+					onPressed: onRefresh,
+				),
 				_PopupProfile(label: profileLabel, onLogout: onLogout),
 			],
 		);
@@ -247,6 +256,11 @@ class _AdminYellowHeader extends StatelessWidget {
 							),
 						],
 					),
+				),
+				IconButton(
+					tooltip: "Recargar",
+					icon: const Icon(Icons.refresh, color: Colors.black87),
+					onPressed: onRefresh,
 				),
 				_PopupProfile(label: profileLabel, onLogout: onLogout),
 			],

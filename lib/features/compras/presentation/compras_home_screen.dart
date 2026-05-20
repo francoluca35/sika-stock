@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
@@ -38,6 +39,7 @@ class _ComprasHomeScreenState extends ConsumerState<ComprasHomeScreen> {
 				children: [
 					_ComprasHeader(
 						title: _tabIndex == 0 ? "COMPRAS" : "PERFIL",
+						onRefresh: () => ScreenRefresh.comprasHome(ref),
 						onLogout: () async {
 							await ref.read(authRepositoryProvider).signOut();
 						},
@@ -78,10 +80,12 @@ class _ComprasHomeScreenState extends ConsumerState<ComprasHomeScreen> {
 class _ComprasHeader extends StatelessWidget {
 	const _ComprasHeader({
 		required this.title,
+		required this.onRefresh,
 		required this.onLogout,
 	});
 
 	final String title;
+	final VoidCallback onRefresh;
 	final Future<void> Function() onLogout;
 
 	@override
@@ -110,7 +114,15 @@ class _ComprasHeader extends StatelessWidget {
 							),
 							Align(
 								alignment: Alignment.centerRight,
-								child: PopupMenuButton<String>(
+								child: Row(
+									mainAxisSize: MainAxisSize.min,
+									children: [
+										IconButton(
+											tooltip: "Recargar",
+											icon: const Icon(Icons.refresh, color: Colors.black87),
+											onPressed: onRefresh,
+										),
+										PopupMenuButton<String>(
 									tooltip: "Más",
 									offset: const Offset(0, 40),
 									icon: const Icon(Icons.more_vert, color: Colors.black87),
@@ -125,6 +137,8 @@ class _ComprasHeader extends StatelessWidget {
 												leading: Icon(Icons.logout, size: 22),
 												title: Text("Cerrar sesión"),
 											),
+										),
+									],
 										),
 									],
 								),

@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../admin/presentation/widgets/admin_shell_bottom_bar.dart";
 import "../../auth/application/auth_providers.dart";
@@ -56,6 +57,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
 						children: [
 							_SupervisorHeader(
 								logoAsset: _logoAsset,
+								onRefresh: () => ScreenRefresh.supervisorHome(ref),
 								onLogout: () async {
 									await ref.read(authRepositoryProvider).signOut();
 								},
@@ -199,6 +201,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
 					children: [
 						_SupervisorHeader(
 							logoAsset: _logoAsset,
+							onRefresh: () => ScreenRefresh.supervisorHome(ref),
 							onLogout: () async {
 								await ref.read(authRepositoryProvider).signOut();
 							},
@@ -216,6 +219,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
 					children: [
 						_SupervisorHeader(
 							logoAsset: _logoAsset,
+							onRefresh: () => ScreenRefresh.supervisorHome(ref),
 							onLogout: () async {
 								await ref.read(authRepositoryProvider).signOut();
 							},
@@ -242,10 +246,12 @@ class SupervisorHomeScreen extends ConsumerWidget {
 class _SupervisorHeader extends StatelessWidget {
 	const _SupervisorHeader({
 		required this.logoAsset,
+		required this.onRefresh,
 		required this.onLogout,
 	});
 
 	final String logoAsset;
+	final VoidCallback onRefresh;
 	final VoidCallback onLogout;
 
 	@override
@@ -286,6 +292,11 @@ class _SupervisorHeader extends StatelessWidget {
 										color: Colors.black87,
 									),
 								),
+							),
+							IconButton(
+								tooltip: "Recargar",
+								icon: const Icon(Icons.refresh, color: Colors.black87),
+								onPressed: onRefresh,
 							),
 							IconButton(
 								tooltip: "Cerrar sesión",

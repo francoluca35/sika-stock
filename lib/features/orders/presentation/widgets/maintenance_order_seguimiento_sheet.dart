@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../supervisor/domain/maintenance_order.dart";
+import "retiro_producto_detail_sheet.dart";
 
 /// Muestra el **seguimiento** del pedido (estados y texto operativo).
 void showMaintenanceOrderSeguimientoSheet(BuildContext context, MaintenanceOrder o) {
@@ -84,6 +85,19 @@ void showMaintenanceOrderSeguimientoSheet(BuildContext context, MaintenanceOrder
 									),
 								),
 							),
+							if (_mostrarVerProducto(o)) ...[
+								const SizedBox(height: 4),
+								OutlinedButton.icon(
+									onPressed: () => showRetiroProductoDetailSheet(ctx, o),
+									icon: const Icon(Icons.inventory_2_outlined, size: 20),
+									label: const Text("Ver producto"),
+									style: OutlinedButton.styleFrom(
+										foregroundColor: Colors.black87,
+										side: const BorderSide(color: Colors.black54, width: 1.2),
+										padding: const EdgeInsets.symmetric(vertical: 12),
+									),
+								),
+							],
 							const SizedBox(height: 8),
 							FilledButton(
 								onPressed: () => Navigator.pop(ctx),
@@ -95,6 +109,14 @@ void showMaintenanceOrderSeguimientoSheet(BuildContext context, MaintenanceOrder
 			);
 		},
 	);
+}
+
+bool _mostrarVerProducto(MaintenanceOrder o) {
+	if (o.workflowStatus == MaintenanceWorkflowStatus.completed) return true;
+	final sid = o.stockItemId?.trim();
+	if (sid != null && sid.isNotEmpty) return true;
+	final foto = o.imagenUrl?.trim();
+	return foto != null && foto.isNotEmpty;
 }
 
 List<String> _seguimientoLineas(MaintenanceOrder o) {
@@ -156,7 +178,7 @@ List<String> _seguimientoLineas(MaintenanceOrder o) {
 			);
 			if (o.stockItemId != null && o.stockItemId!.isNotEmpty) {
 				out.add(
-					"Se descontaron ${o.quantity} u. del inventario al confirmar stock o al cerrar el retiro.",
+					"Se descontaron ${o.quantity} u. del inventario al confirmar RETIRO OK.",
 				);
 			}
 			break;

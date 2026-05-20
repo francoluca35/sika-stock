@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../compras/presentation/widgets/compras_screen_metrics.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
@@ -32,6 +33,7 @@ class PanolSeguimientoScreen extends ConsumerWidget {
 					StockScreenHeader(
 						title: "SEGUIMIENTO",
 						onBack: () => _back(context),
+						onRefresh: () => ScreenRefresh.seguimiento(ref),
 					),
 					Padding(
 						padding: ComprasScreenMetrics.horizontalPadding(context).copyWith(

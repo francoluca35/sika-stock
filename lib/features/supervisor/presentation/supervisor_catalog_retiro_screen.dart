@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
@@ -143,7 +144,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 				SnackBar(
 					content: Text(
 						hayStock
-								? "Registrado: stock confirmado; listo para retiro."
+								? "RETIRO OK: pañol y mantenimiento avisados; pedido en historial; stock descontado."
 								: "Registrado: derivado a pañol (sin stock suficiente en inventario).",
 					),
 				),
@@ -236,6 +237,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 						StockScreenHeader(
 							title: "ELEGIR PRODUCTO",
 							onBack: () => _onBack(context),
+							onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
 						),
 						const Expanded(child: Center(child: CircularProgressIndicator())),
 					],
@@ -249,6 +251,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 						StockScreenHeader(
 							title: "ELEGIR PRODUCTO",
 							onBack: () => _onBack(context),
+							onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
 						),
 						Expanded(
 							child: Center(
@@ -286,6 +289,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 							StockScreenHeader(
 								title: "ELEGIR PRODUCTO",
 								onBack: () => _onBack(context),
+								onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
 							),
 							Expanded(
 								child: Form(
@@ -461,7 +465,7 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 													),
 													onPressed: (sel != null && haySuf) ? () => _confirmar(hayStock: true) : null,
 													child: const Text(
-														"CONFIRMAR RETIRO (HAY STOCK)",
+														"RETIRO OK",
 														style: TextStyle(fontWeight: FontWeight.w800),
 													),
 												),

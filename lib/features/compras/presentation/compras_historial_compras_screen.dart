@@ -1,8 +1,10 @@
 import "dart:math" as math;
 
 import "package:flutter/material.dart";
+import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "widgets/compras_pagination_bar.dart";
@@ -74,15 +76,16 @@ class _CompraHistorialRow {
 }
 
 /// **Historial de compras**: listado + línea de tiempo desde solicitud hasta entrega.
-class ComprasHistorialComprasScreen extends StatefulWidget {
+class ComprasHistorialComprasScreen extends ConsumerStatefulWidget {
 	const ComprasHistorialComprasScreen({super.key});
 
 	@override
-	State<ComprasHistorialComprasScreen> createState() =>
+	ConsumerState<ComprasHistorialComprasScreen> createState() =>
 			_ComprasHistorialComprasScreenState();
 }
 
-class _ComprasHistorialComprasScreenState extends State<ComprasHistorialComprasScreen> {
+class _ComprasHistorialComprasScreenState
+		extends ConsumerState<ComprasHistorialComprasScreen> {
 	final _buscarCtrl = TextEditingController();
 	int _paginaActual = 0;
 	static const int _itemsPorPagina = 10;
@@ -441,6 +444,7 @@ class _ComprasHistorialComprasScreenState extends State<ComprasHistorialComprasS
 								context.go("/home");
 							}
 						},
+						onRefresh: () => ScreenRefresh.compras(ref),
 					),
 					Padding(
 						padding: ComprasScreenMetrics.horizontalPadding(context).copyWith(

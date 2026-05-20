@@ -2,6 +2,7 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../supervisor/domain/maintenance_order.dart";
@@ -53,6 +54,7 @@ class MyMaintenanceOrdersScreen extends ConsumerWidget {
 								context.go("/home");
 							}
 						},
+						onRefresh: () => ScreenRefresh.misPedidos(ref),
 					),
 					Expanded(
 						child: async.when(

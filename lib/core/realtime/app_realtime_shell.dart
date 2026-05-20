@@ -5,6 +5,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../notifications/local_notification_service.dart";
 import "../../features/auth/application/auth_providers.dart";
+import "../../features/auth/application/auth_session_provider.dart";
 import "../../features/auth/domain/app_role.dart";
 import "../../features/compras/application/compras_in_app_notifications_provider.dart";
 import "../../features/compras/domain/compras_in_app_notification_row.dart";
@@ -13,8 +14,9 @@ import "../../features/panol/application/panol_forwarded_orders_provider.dart";
 import "../../features/supervisor/application/maintenance_orders_provider.dart";
 import "../../features/supervisor/domain/maintenance_order.dart";
 import "../../features/supervisor/domain/maintenance_order_notification_row.dart";
+import "app_realtime_sync_provider.dart";
 
-/// Envuelve la app sin polling ni recargas periódicas (solo streams Realtime).
+/// Envuelve la app: Realtime (streams + sync) y avisos, sin polling cada 15 s.
 class AppRealtimeShell extends ConsumerWidget {
 	const AppRealtimeShell({super.key, required this.child});
 
@@ -22,6 +24,10 @@ class AppRealtimeShell extends ConsumerWidget {
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
+		final session = ref.watch(authSessionProvider);
+		if (session != null) {
+			ref.watch(appRealtimeSyncProvider);
+		}
 		return Stack(
 			fit: StackFit.expand,
 			children: [
@@ -51,6 +57,18 @@ class _LiveNotificationListenerState
 	bool _comprasNotifPrimed = false;
 	bool _supervisorOrdersPrimed = false;
 	bool _panolOrdersPrimed = false;
+	String? _sessionUserId;
+
+	void _resetPriming() {
+		_seenMaintNotifIds.clear();
+		_seenComprasNotifIds.clear();
+		_seenSupervisorOrderIds.clear();
+		_seenPanolOrderIds.clear();
+		_maintNotifPrimed = false;
+		_comprasNotifPrimed = false;
+		_supervisorOrdersPrimed = false;
+		_panolOrdersPrimed = false;
+	}
 
 	void _alert({
 		required String idKey,
@@ -123,6 +141,13 @@ class _LiveNotificationListenerState
 				rol == AppRole.superadmin;
 	}
 
+	bool _puedeRecibirAvisoNuevoPedidoPanol() {
+		final rol = ref.read(currentProfileProvider).value?.rol;
+		return rol == AppRole.panol ||
+				rol == AppRole.admin ||
+				rol == AppRole.superadmin;
+	}
+
 	void _onSupervisorOrders(List<MaintenanceOrder> list) {
 		if (!_puedeRecibirAvisoNuevoPedidoSupervisor()) return;
 		if (!_supervisorOrdersPrimed) {
@@ -144,6 +169,7 @@ class _LiveNotificationListenerState
 	}
 
 	void _onPanolOrders(List<MaintenanceOrder> list) {
+		if (!_puedeRecibirAvisoNuevoPedidoPanol()) return;
 		if (!_panolOrdersPrimed) {
 			_seenPanolOrderIds.addAll(list.map((e) => e.id));
 			_panolOrdersPrimed = true;
@@ -164,6 +190,13 @@ class _LiveNotificationListenerState
 
 	@override
 	Widget build(BuildContext context) {
+		ref.listen(authSessionProvider, (prev, next) {
+			final uid = next?.user.id;
+			if (uid != _sessionUserId) {
+				_sessionUserId = uid;
+				_resetPriming();
+			}
+		});
 		ref.listen(mantenimientoNotificacionesProvider, (prev, next) {
 			next.whenData(_onMaintNotifications);
 		});
@@ -175,6 +208,7 @@ class _LiveNotificationListenerState
 			next.whenData(_onSupervisorOrders);
 		});
 		ref.listen(panolForwardedOrdersProvider, (prev, next) {
+			if (!_puedeRecibirAvisoNuevoPedidoPanol()) return;
 			next.whenData(_onPanolOrders);
 		});
 		return const SizedBox.shrink();
