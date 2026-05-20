@@ -89,10 +89,6 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 			hayStock: hayStock,
 			stockItemId: hayStock ? stockItemId : null,
 		);
-		if (hayStock) {
-			await ref.read(maintenanceOrdersRepositoryProvider).markCompleted(id);
-			_afterRetiroInventoryChange();
-		}
 	}
 
 	Future<void> registrarRetiro(String orderId) async {
@@ -104,37 +100,28 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 		_afterRetiroInventoryChange();
 	}
 
-	/// Un solo RETIRO OK: avisa (supervisor_stock_ok) + historial (completed) + un descuento.
+	/// RETIRO OK: solo avisa (→ supervisor_stock_ok). Pañol registra retiro y descuenta.
 	Future<void> confirmarRetiroOk({
 		required MaintenanceOrder order,
 		String? stockItemId,
 	}) async {
-		final repo = ref.read(maintenanceOrdersRepositoryProvider);
-		switch (order.workflowStatus) {
-			case MaintenanceWorkflowStatus.pendingSupervisor:
-				final sid = stockItemId?.trim();
-				if (sid == null || sid.isEmpty) {
-					throw Exception(
-						"Elegí una línea del catálogo (ELEGIR) antes de RETIRO OK.",
-					);
-				}
-				await repo.supervisorDecideStock(
+		if (order.workflowStatus != MaintenanceWorkflowStatus.pendingSupervisor) {
+			throw Exception(
+				"El retiro físico y el descuento de stock los registra pañol.",
+			);
+		}
+		final sid = stockItemId?.trim();
+		if (sid == null || sid.isEmpty) {
+			throw Exception(
+				"Elegí una línea del catálogo (ELEGIR) antes de RETIRO OK.",
+			);
+		}
+		await ref.read(maintenanceOrdersRepositoryProvider).supervisorDecideStock(
 					orderId: order.id,
 					hayStock: true,
 					stockItemId: sid,
 				);
-				await repo.markCompleted(order.id);
-			case MaintenanceWorkflowStatus.supervisorStockOk:
-			case MaintenanceWorkflowStatus.comprasArrivedNotified:
-				final sidOk = stockItemId?.trim();
-				await repo.markCompleted(
-					order.id,
-					stockItemId: sidOk != null && sidOk.isNotEmpty ? sidOk : null,
-				);
-			default:
-				throw Exception("Este pedido no admite RETIRO OK en su estado actual.");
-		}
-		_afterRetiroInventoryChange();
+		_afterWorkflowChange();
 	}
 
 	void _afterRetiroInventoryChange() {

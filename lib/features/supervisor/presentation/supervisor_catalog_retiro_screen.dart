@@ -144,7 +144,8 @@ class _SupervisorCatalogRetiroScreenState extends ConsumerState<SupervisorCatalo
 				SnackBar(
 					content: Text(
 						hayStock
-								? "RETIRO OK: pañol y mantenimiento avisados; pedido en historial; stock descontado."
+								? "RETIRO OK: pañol y mantenimiento avisados. "
+									"Pañol registrará el retiro y descontará stock."
 								: "Registrado: derivado a pañol (sin stock suficiente en inventario).",
 					),
 				),

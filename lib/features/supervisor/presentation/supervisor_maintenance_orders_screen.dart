@@ -101,9 +101,7 @@ class _SupervisorMaintenanceOrdersScreenState
   }
 
   bool _puedeElegirLineaStock(MaintenanceOrder o) {
-    return o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor ||
-        o.workflowStatus == MaintenanceWorkflowStatus.supervisorStockOk ||
-        o.workflowStatus == MaintenanceWorkflowStatus.comprasArrivedNotified;
+    return o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor;
   }
 
   String? _stockItemIdParaRetiro(
@@ -199,43 +197,25 @@ class _SupervisorMaintenanceOrdersScreenState
           ),
       ],
       if (o.workflowStatus == MaintenanceWorkflowStatus.supervisorStockOk ||
-          o.workflowStatus == MaintenanceWorkflowStatus.comprasArrivedNotified) ...[
-        if (_catalogOverrideByOrderId.containsKey(o.id))
-          Padding(
-            padding: const EdgeInsets.only(top: 2, right: 6),
+          o.workflowStatus == MaintenanceWorkflowStatus.comprasArrivedNotified)
+        Padding(
+          padding: const EdgeInsets.only(top: 4, right: 6),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 200),
             child: Text(
-              analisis.haySuficiente
-                  ? "Nueva línea: ${analisis.match!.nombre}"
-                  : "Sin stock suficiente en línea elegida",
+              o.workflowStatus == MaintenanceWorkflowStatus.comprasArrivedNotified
+                  ? "En planta — pañol registra retiro y descuenta stock."
+                  : "Listo para retiro — pañol cierra la orden y descuenta stock.",
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w700,
-                color: analisis.haySuficiente
-                    ? Colors.green.shade800
-                    : Colors.orange.shade900,
+                fontWeight: FontWeight.w600,
+                color: Colors.blueGrey.shade800,
+                height: 1.25,
               ),
+              maxLines: 3,
             ),
           ),
-        _TextActionButton(
-          label: "RETIRO OK",
-          background: AppTokens.statusOk,
-          foreground: Colors.white,
-          onPressed: () {
-            if (_catalogOverrideByOrderId.containsKey(o.id) &&
-                !analisis.haySuficiente) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text(
-                    "La línea elegida no tiene stock suficiente. Elegí otra o derivá a pañol.",
-                  ),
-                ),
-              );
-              return;
-            }
-            _confirmarRetiroOk(context, o, catalog);
-          },
         ),
-      ],
     ];
   }
 
@@ -709,15 +689,11 @@ class _SupervisorMaintenanceOrdersScreenState
       if (!mounted) return;
       setState(() => _catalogOverrideByOrderId.remove(o.id));
       if (!context.mounted) return;
-      final desconto =
-          stockId != null && stockId.isNotEmpty;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            desconto
-                ? "RETIRO OK: ${o.numeroOrden} · pañol y mantenimiento avisados; "
-                    "en historial; se descontaron ${o.quantity} u."
-                : "RETIRO OK: ${o.numeroOrden} · pañol y mantenimiento avisados; en historial.",
+            "RETIRO OK: ${o.numeroOrden} · aviso a pañol y mantenimiento. "
+            "El descuento de stock lo hace pañol al retirar.",
           ),
         ),
       );

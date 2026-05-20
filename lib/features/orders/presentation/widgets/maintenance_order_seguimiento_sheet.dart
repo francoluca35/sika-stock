@@ -132,17 +132,11 @@ List<String> _seguimientoLineas(MaintenanceOrder o) {
 			break;
 		case MaintenanceWorkflowStatus.supervisorStockOk:
 			out.add(
-				"Supervisor confirmó stock disponible para retiro.",
+				"Supervisor confirmó stock disponible para retiro (avisó a pañol y mantenimiento).",
 			);
-			if (o.stockItemId != null && o.stockItemId!.isNotEmpty) {
-				out.add(
-					"Inventario: se descontaron ${o.quantity} u. del ítem asociado al confirmar stock.",
-				);
-			} else {
-				out.add(
-					"Coordiná la entrega física con pañol (esta OM no tiene descuento automático en catálogo).",
-				);
-			}
+			out.add(
+				"Pañol debe registrar el retiro; ahí se descontará ${o.quantity} u. del inventario.",
+			);
 			break;
 		case MaintenanceWorkflowStatus.forwardedToPanol:
 			out.add(
@@ -178,7 +172,7 @@ List<String> _seguimientoLineas(MaintenanceOrder o) {
 			);
 			if (o.stockItemId != null && o.stockItemId!.isNotEmpty) {
 				out.add(
-					"Se descontaron ${o.quantity} u. del inventario al confirmar RETIRO OK.",
+					"Se descontaron ${o.quantity} u. del inventario al registrar el retiro en pañol.",
 				);
 			}
 			break;
