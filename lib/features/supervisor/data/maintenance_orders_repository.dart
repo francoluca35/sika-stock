@@ -153,13 +153,21 @@ class MaintenanceOrdersRepository {
 		);
 	}
 
-	Future<void> markCompleted(String orderId) async {
+	Future<void> markCompleted(
+		String orderId, {
+		String? stockItemId,
+	}) async {
 		if (_client.auth.currentUser?.id == null) {
 			throw Exception("No hay sesión");
 		}
+		final sid = stockItemId?.trim();
+		final params = <String, dynamic>{
+			"p_order_id": orderId,
+			"p_stock_item_id": (sid != null && sid.isNotEmpty) ? sid : null,
+		};
 		await _client.rpc<void>(
 			"complete_maintenance_order_with_inventory",
-			params: <String, dynamic>{"p_order_id": orderId},
+			params: params,
 		);
 	}
 

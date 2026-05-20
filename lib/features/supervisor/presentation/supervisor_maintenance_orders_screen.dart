@@ -100,6 +100,145 @@ class _SupervisorMaintenanceOrdersScreenState
     return analizarStockPedido(o, catalog);
   }
 
+  bool _puedeElegirLineaStock(MaintenanceOrder o) {
+    return o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor ||
+        o.workflowStatus == MaintenanceWorkflowStatus.supervisorStockOk ||
+        o.workflowStatus == MaintenanceWorkflowStatus.comprasArrivedNotified;
+  }
+
+  String? _stockItemIdParaRetiro(
+    MaintenanceOrder o,
+    List<StockProduct> catalog,
+  ) {
+    final analisis = _analisisParaOrden(o, catalog);
+    if (_catalogOverrideByOrderId.containsKey(o.id)) {
+      return analisis.match?.id;
+    }
+    if (o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor) {
+      return analisis.match?.id;
+    }
+    return o.stockItemId;
+  }
+
+  List<Widget> _infoActionButtons(
+    BuildContext context,
+    MaintenanceOrder o,
+    List<StockProduct> catalog,
+  ) {
+    final analisis = _analisisParaOrden(o, catalog);
+    return [
+      _TextActionButton(
+        label: "VER",
+        background: AppTokens.yellowHeader,
+        foreground: Colors.black87,
+        onPressed: () => _mostrarDetalle(context, o),
+      ),
+      if (_puedeElegirLineaStock(o))
+        _TextActionButton(
+          label: "ELEGIR",
+          background: Colors.grey.shade200,
+          foreground: Colors.black87,
+          onPressed: () => _elegirProductoCatalogo(context, o, catalog),
+        ),
+      if (o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor) ...[
+        if (analisis.haySuficiente && analisis.match != null) ...[
+          if (_catalogOverrideByOrderId.containsKey(o.id))
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 6),
+              child: Text(
+                "Línea: ${analisis.match!.nombre}",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.green.shade800,
+                ),
+              ),
+            ),
+          _TextActionButton(
+            label: "RETIRO OK",
+            background: AppTokens.statusOk,
+            foreground: Colors.white,
+            onPressed: () => _confirmarRetiroOk(context, o, catalog),
+          ),
+        ] else if (!analisis.haySuficiente) ...[
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 4),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 160),
+              child: Text(
+                analisis.match != null
+                    ? "Sin stock suficiente"
+                    : "Sin coincidencia · pañol",
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.orange.shade900,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+          _TextActionButton(
+            label: "A PAÑOL",
+            background: Colors.orange.shade800,
+            foreground: Colors.white,
+            onPressed: () => _decidirStock(context, o, hayStock: false),
+          ),
+        ] else if (analisis.haySuficiente && analisis.match == null)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 4),
+            child: Text(
+              "Usá ELEGIR y RETIRO OK",
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.orange.shade900,
+              ),
+            ),
+          ),
+      ],
+      if (o.workflowStatus == MaintenanceWorkflowStatus.supervisorStockOk ||
+          o.workflowStatus == MaintenanceWorkflowStatus.comprasArrivedNotified) ...[
+        if (_catalogOverrideByOrderId.containsKey(o.id))
+          Padding(
+            padding: const EdgeInsets.only(top: 2, right: 6),
+            child: Text(
+              analisis.haySuficiente
+                  ? "Nueva línea: ${analisis.match!.nombre}"
+                  : "Sin stock suficiente en línea elegida",
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: analisis.haySuficiente
+                    ? Colors.green.shade800
+                    : Colors.orange.shade900,
+              ),
+            ),
+          ),
+        _TextActionButton(
+          label: "RETIRO OK",
+          background: AppTokens.statusOk,
+          foreground: Colors.white,
+          onPressed: () {
+            if (_catalogOverrideByOrderId.containsKey(o.id) &&
+                !analisis.haySuficiente) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    "La línea elegida no tiene stock suficiente. Elegí otra o derivá a pañol.",
+                  ),
+                ),
+              );
+              return;
+            }
+            _confirmarRetiroOk(context, o, catalog);
+          },
+        ),
+      ],
+    ];
+  }
+
   Future<void> _elegirProductoCatalogo(
     BuildContext context,
     MaintenanceOrder o,
@@ -424,6 +563,17 @@ class _SupervisorMaintenanceOrdersScreenState
                     ),
                   ),
                 ],
+                if (_puedeElegirLineaStock(o)) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _elegirProductoCatalogo(context, o, catalog);
+                    },
+                    icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                    label: const Text("Elegir otra línea del catálogo"),
+                  ),
+                ],
                 if (o.workflowStatus ==
                     MaintenanceWorkflowStatus.pendingSupervisor) ...[
                   const SizedBox(height: 16),
@@ -518,14 +668,6 @@ class _SupervisorMaintenanceOrdersScreenState
                               ),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          OutlinedButton(
-                            onPressed: () {
-                              Navigator.of(ctx).pop();
-                              _elegirProductoCatalogo(context, o, catalog);
-                            },
-                            child: const Text("Elegir otra línea del catálogo"),
-                          ),
                         ],
                       ),
                     ),
@@ -545,95 +687,11 @@ class _SupervisorMaintenanceOrdersScreenState
     MaintenanceOrder o,
     List<StockProduct> catalog,
   ) {
-    final analisis = _analisisParaOrden(o, catalog);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       alignment: WrapAlignment.start,
-      children: [
-        _TextActionButton(
-          label: "VER",
-          background: AppTokens.yellowHeader,
-          foreground: Colors.black87,
-          onPressed: () => _mostrarDetalle(context, o),
-        ),
-        if (o.workflowStatus ==
-            MaintenanceWorkflowStatus.pendingSupervisor) ...[
-          _TextActionButton(
-            label: "ELEGIR",
-            background: Colors.grey.shade200,
-            foreground: Colors.black87,
-            onPressed: () => _elegirProductoCatalogo(context, o, catalog),
-          ),
-          if (analisis.haySuficiente && analisis.match != null) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 2, right: 6),
-              child: Text(
-                _catalogOverrideByOrderId.containsKey(o.id)
-                    ? "Línea elegida: ${analisis.match!.nombre}"
-                    : "Catálogo OK",
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.green.shade800,
-                ),
-              ),
-            ),
-            _TextActionButton(
-              label: "RETIRO OK",
-              background: AppTokens.statusOk,
-              foreground: Colors.white,
-              onPressed: () => _confirmarRetiroOk(context, o, catalog),
-            ),
-          ] else if (!analisis.haySuficiente) ...[
-            Padding(
-              padding: const EdgeInsets.only(top: 2, right: 4),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 160),
-                child: Text(
-                  analisis.match != null
-                      ? "Sin stock suficiente"
-                      : "Sin coincidencia · pañol",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.orange.shade900,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-            _TextActionButton(
-              label: "A PAÑOL",
-              background: Colors.orange.shade800,
-              foreground: Colors.white,
-              onPressed: () => _decidirStock(context, o, hayStock: false),
-            ),
-          ] else if (analisis.haySuficiente && analisis.match == null)
-            Padding(
-              padding: const EdgeInsets.only(top: 2, right: 4),
-              child: Text(
-                "Usá ELEGIR y RETIRO OK",
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.orange.shade900,
-                ),
-              ),
-            ),
-        ],
-        if (o.workflowStatus ==
-                MaintenanceWorkflowStatus.supervisorStockOk ||
-            o.workflowStatus ==
-                MaintenanceWorkflowStatus.comprasArrivedNotified)
-          _TextActionButton(
-            label: "RETIRO OK",
-            background: AppTokens.statusOk,
-            foreground: Colors.white,
-            onPressed: () => _confirmarRetiroOk(context, o, catalog),
-          ),
-      ],
+      children: _infoActionButtons(context, o, catalog),
     );
   }
 
@@ -642,11 +700,7 @@ class _SupervisorMaintenanceOrdersScreenState
     MaintenanceOrder o,
     List<StockProduct> catalog,
   ) async {
-    final analisis = _analisisParaOrden(o, catalog);
-    final stockId = o.workflowStatus ==
-            MaintenanceWorkflowStatus.pendingSupervisor
-        ? analisis.match?.id
-        : o.stockItemId;
+    final stockId = _stockItemIdParaRetiro(o, catalog);
     try {
       await ref.read(maintenanceOrdersProvider.notifier).confirmarRetiroOk(
             order: o,
@@ -887,7 +941,7 @@ class _SupervisorMaintenanceOrdersScreenState
                                     1: FlexColumnWidth(1.15),
                                     2: FlexColumnWidth(1.85),
                                     3: FlexColumnWidth(1),
-                                    4: FlexColumnWidth(1.2),
+                                    4: FlexColumnWidth(1.55),
                                   },
                                   border: TableBorder.all(
                                     color: Colors.grey.shade300,
@@ -925,8 +979,6 @@ class _SupervisorMaintenanceOrdersScreenState
                                     for (var i = 0; i < pedidos.length; i++)
                                       () {
                                         final fila = pedidos[i];
-                                        final analisis =
-                                            _analisisParaOrden(fila, catalog);
                                         final (ebg, efg) =
                                             SupervisorMaintenanceOrdersScreen
                                                 ._workflowBadgeColors(fila);
@@ -974,121 +1026,11 @@ class _SupervisorMaintenanceOrdersScreenState
                                               child: Wrap(
                                                 spacing: 6,
                                                 runSpacing: 6,
-                                                children: [
-                                                  _TextActionButton(
-                                                    label: "VER",
-                                                    background:
-                                                        AppTokens.yellowHeader,
-                                                    foreground: Colors.black87,
-                                                    onPressed: () =>
-                                                        _mostrarDetalle(
-                                                      context,
-                                                      fila,
-                                                    ),
-                                                  ),
-                                                  if (fila.workflowStatus ==
-                                                      MaintenanceWorkflowStatus
-                                                          .pendingSupervisor) ...[
-                                                    _TextActionButton(
-                                                      label: "ELEGIR",
-                                                      background:
-                                                          Colors.grey.shade200,
-                                                      foreground: Colors.black87,
-                                                      onPressed: () =>
-                                                          _elegirProductoCatalogo(
-                                                        context,
-                                                        fila,
-                                                        catalog,
-                                                      ),
-                                                    ),
-                                                    if (analisis.haySuficiente &&
-                                                        analisis.match != null)
-                                                      _TextActionButton(
-                                                        label: "RETIRO OK",
-                                                        background:
-                                                            AppTokens.statusOk,
-                                                        foreground: Colors.white,
-                                                        onPressed: () =>
-                                                            _confirmarRetiroOk(
-                                                          context,
-                                                          fila,
-                                                          catalog,
-                                                        ),
-                                                      )
-                                                    else if (!analisis
-                                                        .haySuficiente)
-                                                      _TextActionButton(
-                                                        label: "A PAÑOL",
-                                                        background: Colors
-                                                            .orange.shade800,
-                                                        foreground: Colors.white,
-                                                        onPressed: () =>
-                                                            _decidirStock(
-                                                          context,
-                                                          fila,
-                                                          hayStock: false,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                  if (fila.workflowStatus ==
-                                                          MaintenanceWorkflowStatus
-                                                              .supervisorStockOk ||
-                                                      fila.workflowStatus ==
-                                                          MaintenanceWorkflowStatus
-                                                              .comprasArrivedNotified)
-                                                    _TextActionButton(
-                                                      label: "RETIRO OK",
-                                                      background:
-                                                          AppTokens.statusOk,
-                                                      foreground: Colors.white,
-                                                      onPressed: () =>
-                                                          _confirmarRetiroOk(
-                                                        context,
-                                                        fila,
-                                                        catalog,
-                                                      ),
-                                                    ),
-                                                  if (fila.workflowStatus ==
-                                                          MaintenanceWorkflowStatus
-                                                              .pendingSupervisor &&
-                                                      analisis.haySuficiente)
-                                                    Padding(
-                                                      padding:
-                                                          const EdgeInsets.only(
-                                                        left: 4,
-                                                        top: 4,
-                                                      ),
-                                                      child: Text(
-                                                        "Según catálogo o línea elegida",
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          color: Colors
-                                                              .green.shade800,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  if (fila.workflowStatus ==
-                                                          MaintenanceWorkflowStatus
-                                                              .pendingSupervisor &&
-                                                      !analisis.haySuficiente)
-                                                    Padding(
-                                                      padding:
-                                                          const EdgeInsets.only(
-                                                        left: 4,
-                                                        top: 4,
-                                                      ),
-                                                      child: Text(
-                                                        analisis.match != null
-                                                            ? "Sin stock suficiente"
-                                                            : "Sin coincidencia en catálogo",
-                                                        style: TextStyle(
-                                                          fontSize: 10,
-                                                          color: Colors
-                                                              .orange.shade900,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                ],
+                                                children: _infoActionButtons(
+                                                  context,
+                                                  fila,
+                                                  catalog,
+                                                ),
                                               ),
                                             ),
                                           ],

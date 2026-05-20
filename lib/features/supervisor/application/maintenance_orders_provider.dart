@@ -126,7 +126,11 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 				await repo.markCompleted(order.id);
 			case MaintenanceWorkflowStatus.supervisorStockOk:
 			case MaintenanceWorkflowStatus.comprasArrivedNotified:
-				await repo.markCompleted(order.id);
+				final sidOk = stockItemId?.trim();
+				await repo.markCompleted(
+					order.id,
+					stockItemId: sidOk != null && sidOk.isNotEmpty ? sidOk : null,
+				);
 			default:
 				throw Exception("Este pedido no admite RETIRO OK en su estado actual.");
 		}

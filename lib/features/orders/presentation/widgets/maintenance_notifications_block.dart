@@ -128,6 +128,8 @@ class MaintenanceNotificationsBlock extends ConsumerWidget {
 																						const Color(0xFF1B5E20),
 																				"enviado_a_compras" =>
 																						Colors.orange.shade900,
+																				"sin_stock_pendiente" =>
+																						Colors.orange.shade900,
 																				"compra_realizada" =>
 																						Colors.deepOrange.shade900,
 																				"oc_emitida_compras" =>
