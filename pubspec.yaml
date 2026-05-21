@@ -23,6 +23,7 @@ dependencies:
   open_filex: ^4.7.0
   pdf: ^3.11.3
   pdfx: ^2.9.2
+  syncfusion_flutter_pdf: ^28.2.12
   printing: ^5.14.3
   share_plus: ^10.1.4
   signature: ^5.5.0

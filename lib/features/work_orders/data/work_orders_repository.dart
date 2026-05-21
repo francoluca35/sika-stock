@@ -4,6 +4,7 @@ import "package:supabase_flutter/supabase_flutter.dart";
 
 import "../../auth/domain/profile_row.dart";
 import "../domain/work_order.dart";
+import "../domain/work_order_check_item.dart";
 import "../domain/work_order_pdf_metadata.dart";
 import "work_order_pdf_builder.dart";
 import "work_order_pdf_metadata_parser.dart";
@@ -144,6 +145,7 @@ class WorkOrdersRepository {
 		required WorkOrderFormData formData,
 		required Uint8List signaturePng,
 		List<Uint8List> attachmentImages = const [],
+		List<WorkOrderCheckItem> checklist = const [],
 	}) async {
 		final uid = _client.auth.currentUser?.id;
 		if (uid == null) throw Exception("No hay sesión");
@@ -153,7 +155,8 @@ class WorkOrdersRepository {
 		final wo = assignment.workOrder;
 		if (wo == null) throw Exception("Pedido no encontrado");
 
-		final closedAt = DateTime.now().toUtc();
+		final startedAt = formData.startedAt ?? DateTime.now().toUtc();
+		final finishedAt = formData.finishedAt ?? DateTime.now().toUtc();
 
 		final sigPath = "${wo.id}/responses/$uid/signature.png";
 		await _client.storage.from(_bucket).uploadBinary(
@@ -184,8 +187,9 @@ class WorkOrdersRepository {
 			metadata: wo.pdfMetadata.withReceiver(assigneeName),
 			assigneeName: assigneeName,
 			formData: formData,
-			startedAt: closedAt,
-			finishedAt: closedAt,
+			checklist: checklist,
+			startedAt: startedAt,
+			finishedAt: finishedAt,
 			signaturePng: signaturePng,
 		);
 		final pdfPath = "${wo.id}/responses/$uid/completed.pdf";
@@ -201,13 +205,13 @@ class WorkOrdersRepository {
 		await _client.from("work_order_responses").insert({
 			"assignment_id": assignment.id,
 			"observations": formData.observations.trim(),
-			"checklist": [],
+			"checklist": checklist.map((e) => e.toJson()).toList(),
 			"form_data": formData.toJson(),
 			"signature_path": sigPath,
 			"completed_pdf_path": pdfPath,
 			"attachment_paths": attachmentPaths,
-			"started_at": closedAt.toIso8601String(),
-			"finished_at": closedAt.toIso8601String(),
+			"started_at": startedAt.toIso8601String(),
+			"finished_at": finishedAt.toIso8601String(),
 		});
 	}
 
