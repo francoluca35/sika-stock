@@ -475,7 +475,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
             selectedIndex: 0,
             onPedido: () {},
             onHistorial: () => _soon(context, "Historial de pedidos"),
-            onPerfil: () => _soon(context, "Perfil"),
+            onPerfil: () => context.push("/configuracion"),
           ),
         ],
       ),

@@ -34,12 +34,6 @@ class SupervisorHomeScreen extends ConsumerWidget {
 		return "usuario";
 	}
 
-	void _soon(BuildContext context, String feature) {
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(content: Text("$feature — próximamente.")),
-		);
-	}
-
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
 		final profileAsync = ref.watch(currentProfileProvider);
@@ -188,7 +182,7 @@ class SupervisorHomeScreen extends ConsumerWidget {
 								showCrearOrdenCompra: false,
 								onInicio: () {},
 								onOrdenCompra: () {},
-								onConfig: () => _soon(context, "Configuración"),
+								onConfig: () => context.push("/configuracion"),
 							),
 						],
 					),

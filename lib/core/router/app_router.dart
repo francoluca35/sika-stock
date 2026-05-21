@@ -8,8 +8,11 @@ import "../../features/compras/presentation/compras_historial_compras_screen.dar
 import "../../features/compras/presentation/compras_historial_pedidos_screen.dart";
 import "../../features/admin/presentation/create_users_screen.dart";
 import "../../features/admin/presentation/users_list_screen.dart";
+import "../../features/work_orders/presentation/admin/work_orders_admin_screen.dart";
+import "../../features/work_orders/presentation/mantenimiento/my_work_orders_screen.dart";
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/presentation/login_screen.dart";
+import "../../features/settings/presentation/account_settings_screen.dart";
 import "../../features/home/presentation/home_screen.dart";
 import "../../features/orders/presentation/my_maintenance_orders_screen.dart";
 import "../../features/orders/presentation/place_order_screen.dart";
@@ -57,6 +60,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				builder: (context, state) => const HomeScreen(),
 			),
 			GoRoute(
+				path: "/configuracion",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const AccountSettingsScreen(),
+				),
+			),
+			GoRoute(
 				path: "/compras/historial-pedidos",
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
@@ -82,6 +92,20 @@ final goRouterProvider = Provider<GoRouter>((ref) {
 				pageBuilder: (context, state) => slideHorizontalRoutePage(
 					pageKey: state.pageKey,
 					child: const UsersListScreen(),
+				),
+			),
+			GoRoute(
+				path: "/admin/ordenes-trabajo",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const WorkOrdersAdminScreen(),
+				),
+			),
+			GoRoute(
+				path: "/mantenimiento/ordenes-trabajo",
+				pageBuilder: (context, state) => slideHorizontalRoutePage(
+					pageKey: state.pageKey,
+					child: const MyWorkOrdersScreen(),
 				),
 			),
 			GoRoute(

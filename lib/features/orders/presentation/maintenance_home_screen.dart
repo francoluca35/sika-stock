@@ -12,12 +12,6 @@ import "widgets/order_hub_bottom_bar.dart";
 class MaintenanceHomeScreen extends ConsumerWidget {
 	const MaintenanceHomeScreen({super.key});
 
-	void _soon(BuildContext context, String msg) {
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(content: Text("$msg — próximamente.")),
-		);
-	}
-
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
 		final bottomInset = MediaQuery.paddingOf(context).bottom;
@@ -82,6 +76,21 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 												subtitle: "Ver el estado de tus pedidos y retiros",
 												onTap: () => context.push("/pedidos/mis-pedidos"),
 											),
+											const SizedBox(height: 16),
+											_MaintenanceMenuCard(
+												leadingDecoration: const BoxDecoration(
+													color: AppTokens.redAction,
+													borderRadius: BorderRadius.all(Radius.circular(12)),
+												),
+												leading: const Icon(
+													Icons.description_outlined,
+													color: Colors.white,
+													size: 28,
+												),
+												title: "ÓRDENES DE TRABAJO",
+												subtitle: "Completar OT asignadas, firmar y enviar",
+												onTap: () => context.push("/mantenimiento/ordenes-trabajo"),
+											),
 										],
 									),
 								),
@@ -93,7 +102,7 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 						selectedIndex: null,
 						onPedido: () => context.push("/pedidos/nuevo"),
 						onHistorial: () => context.push("/pedidos/mis-pedidos"),
-						onPerfil: () => _soon(context, "Perfil"),
+						onPerfil: () => context.push("/configuracion"),
 					),
 				],
 			),
@@ -157,9 +166,21 @@ class _MaintenanceHomeHeader extends StatelessWidget {
 									],
 								),
 								onSelected: (value) async {
-									if (value == "logout") await onLogout();
+									if (value == "config") {
+										context.push("/configuracion");
+									} else if (value == "logout") {
+										await onLogout();
+									}
 								},
 								itemBuilder: (context) => [
+									const PopupMenuItem(
+										value: "config",
+										child: ListTile(
+											contentPadding: EdgeInsets.zero,
+											leading: Icon(Icons.settings_outlined, size: 22),
+											title: Text("Configuración"),
+										),
+									),
 									const PopupMenuItem(
 										value: "logout",
 										child: ListTile(
