@@ -7,6 +7,9 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../auth/domain/profile_row.dart";
 import "../../application/work_orders_providers.dart";
+import "../../data/work_order_pdf_metadata_parser.dart";
+import "../../domain/work_order_pdf_metadata.dart";
+import "../widgets/ot_order_info_section.dart";
 
 class WorkOrderNewScreen extends ConsumerStatefulWidget {
 	const WorkOrderNewScreen({super.key});
@@ -20,6 +23,7 @@ class _WorkOrderNewScreenState extends ConsumerState<WorkOrderNewScreen> {
 	final _otCtrl = TextEditingController();
 	Uint8List? _pdfBytes;
 	String? _fileName;
+	WorkOrderPdfMetadata? _parsedPreview;
 	final Set<String> _selectedUserIds = {};
 	bool _sending = false;
 
@@ -46,15 +50,22 @@ class _WorkOrderNewScreenState extends ConsumerState<WorkOrderNewScreen> {
 			);
 			return;
 		}
+		final parsed = WorkOrderPdfMetadataParser.parseFromPdfBytes(bytes);
 		setState(() {
 			_pdfBytes = bytes;
 			_fileName = f.name;
+			_parsedPreview = parsed;
 			if (_titleCtrl.text.trim().isEmpty) {
 				_titleCtrl.text = f.name.replaceAll(RegExp(r"\.pdf$", caseSensitive: false), "");
 			}
-			final otMatch = RegExp(r"OT[-\s]?(\d+)", caseSensitive: false).firstMatch(f.name);
-			if (otMatch != null && _otCtrl.text.trim().isEmpty) {
-				_otCtrl.text = otMatch.group(1) ?? "";
+			final ot = parsed.orderNumber;
+			if (ot.isNotEmpty && _otCtrl.text.trim().isEmpty) {
+				_otCtrl.text = ot;
+			} else {
+				final otMatch = RegExp(r"OT[-\s]?(\d+)", caseSensitive: false).firstMatch(f.name);
+				if (otMatch != null && _otCtrl.text.trim().isEmpty) {
+					_otCtrl.text = otMatch.group(1) ?? "";
+				}
 			}
 		});
 	}
@@ -95,14 +106,14 @@ class _WorkOrderNewScreenState extends ConsumerState<WorkOrderNewScreen> {
 			if (!mounted) return;
 			final wo = await ref.read(workOrdersRepositoryProvider).fetchWorkOrderById(id);
 			if (!mounted) return;
-			if (wo != null && wo.pdfMetadata.hasAnyData) {
-				ScaffoldMessenger.of(context).showSnackBar(
-					SnackBar(
-						content: Text(
-							"PDF leído: OT ${wo.pdfMetadata.orderNumber.isEmpty ? (wo.otNumber ?? "—") : wo.pdfMetadata.orderNumber}",
-						),
-					),
-				);
+			if (wo != null) {
+				final m = wo.pdfMetadata;
+				final msg = m.hasAnyData
+						? "PDF leído: OT ${m.orderNumber.isEmpty ? (wo.otNumber ?? "—") : m.orderNumber}"
+								"${m.plant.isNotEmpty ? " · ${m.plant}" : ""}"
+								"${m.orderType.isNotEmpty ? " · ${m.orderType}" : ""}"
+						: "PDF subido; revisá la vista previa (pocos campos detectados).";
+				ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
 			}
 			if (!mounted) return;
 			Navigator.of(context).pop(true);
@@ -136,6 +147,18 @@ class _WorkOrderNewScreenState extends ConsumerState<WorkOrderNewScreen> {
 						label: Text(_fileName ?? "Elegir PDF"),
 					),
 					const SizedBox(height: 16),
+					if (_parsedPreview != null && _parsedPreview!.hasAnyData) ...[
+						Card(
+							child: Padding(
+								padding: const EdgeInsets.all(12),
+								child: OtOrderInfoSection(
+									metadata: _parsedPreview!,
+									otNumberFallback: _otCtrl.text.trim().isEmpty ? null : _otCtrl.text.trim(),
+								),
+							),
+						),
+						const SizedBox(height: 16),
+					],
 					TextField(
 						controller: _titleCtrl,
 						decoration: const InputDecoration(

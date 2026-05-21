@@ -26,4 +26,10 @@ class WorkOrderCheckItem {
 				WorkOrderCheckItem(label: "Materiales y mano de obra registrados"),
 				WorkOrderCheckItem(label: "Área de trabajo en orden y segura"),
 			];
+
+	/// Ítems desde pasos del procedimiento leídos del PDF, o checklist genérico.
+	static List<WorkOrderCheckItem> fromProcedureSteps(List<String> steps) {
+		if (steps.isEmpty) return defaultChecklist();
+		return steps.map((s) => WorkOrderCheckItem(label: s)).toList();
+	}
 }

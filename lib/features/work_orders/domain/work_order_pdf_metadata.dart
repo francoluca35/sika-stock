@@ -1,3 +1,5 @@
+import "work_order_form_rows.dart";
+
 /// Datos leídos del PDF oficial (solo lectura para mantenimiento).
 class WorkOrderPdfMetadata {
 	const WorkOrderPdfMetadata({
@@ -12,6 +14,10 @@ class WorkOrderPdfMetadata {
 		this.receiver = "",
 		this.tolerance = "",
 		this.workDescription = "",
+		this.procedure = "",
+		this.requestedBy = "",
+		this.priority = "",
+		this.procedureSteps = const [],
 	});
 
 	final String company;
@@ -22,17 +28,26 @@ class WorkOrderPdfMetadata {
 	final String date;
 	final String responsible;
 	final String orderNumber;
-	/// En pantalla se completa con el técnico asignado (no viene del PDF).
 	final String receiver;
 	final String tolerance;
 	final String workDescription;
+	final String procedure;
+	final String requestedBy;
+	final String priority;
+	final List<String> procedureSteps;
 
 	bool get hasAnyData =>
 			company.isNotEmpty ||
 			plant.isNotEmpty ||
 			sector.isNotEmpty ||
+			location.isNotEmpty ||
 			orderType.isNotEmpty ||
-			orderNumber.isNotEmpty;
+			orderNumber.isNotEmpty ||
+			date.isNotEmpty ||
+			responsible.isNotEmpty ||
+			procedure.isNotEmpty ||
+			workDescription.isNotEmpty ||
+			procedureSteps.isNotEmpty;
 
 	WorkOrderPdfMetadata withReceiver(String name) {
 		final n = name.trim();
@@ -49,6 +64,10 @@ class WorkOrderPdfMetadata {
 			receiver: n,
 			tolerance: tolerance,
 			workDescription: workDescription,
+			procedure: procedure,
+			requestedBy: requestedBy,
+			priority: priority,
+			procedureSteps: procedureSteps,
 		);
 	}
 
@@ -64,10 +83,21 @@ class WorkOrderPdfMetadata {
 				"receiver": receiver,
 				"tolerance": tolerance,
 				"workDescription": workDescription,
+				"procedure": procedure,
+				"requestedBy": requestedBy,
+				"priority": priority,
+				"procedureSteps": procedureSteps,
 			};
 
 	factory WorkOrderPdfMetadata.fromJson(Map<String, dynamic>? m) {
 		if (m == null || m.isEmpty) return const WorkOrderPdfMetadata();
+		final stepsRaw = m["procedureSteps"];
+		final List<String> steps;
+		if (stepsRaw is List) {
+			steps = stepsRaw.map((e) => e.toString().trim()).where((s) => s.isNotEmpty).toList();
+		} else {
+			steps = [];
+		}
 		return WorkOrderPdfMetadata(
 			company: str(m["company"]),
 			plant: str(m["plant"]),
@@ -80,6 +110,10 @@ class WorkOrderPdfMetadata {
 			receiver: str(m["receiver"]),
 			tolerance: str(m["tolerance"]),
 			workDescription: str(m["workDescription"]),
+			procedure: str(m["procedure"]),
+			requestedBy: str(m["requestedBy"]),
+			priority: str(m["priority"]),
+			procedureSteps: steps,
 		);
 	}
 
@@ -92,24 +126,57 @@ class WorkOrderFormData {
 		this.workDescription = "",
 		this.tasksNews = "",
 		this.observations = "",
+		this.materials = const [],
+		this.labor = const [],
+		this.counterState = "",
+		this.startedAtIso,
+		this.finishedAtIso,
 	});
 
 	final String workDescription;
 	final String tasksNews;
 	final String observations;
+	final List<OtMaterialRow> materials;
+	final List<OtLaborRow> labor;
+	final String counterState;
+	final String? startedAtIso;
+	final String? finishedAtIso;
 
 	Map<String, dynamic> toJson() => {
 				"workDescription": workDescription,
 				"tasksNews": tasksNews,
 				"observations": observations,
+				"materials": materials.map((e) => e.toJson()).toList(),
+				"labor": labor.map((e) => e.toJson()).toList(),
+				"counterState": counterState,
+				if (startedAtIso != null) "startedAt": startedAtIso,
+				if (finishedAtIso != null) "finishedAt": finishedAtIso,
 			};
 
 	factory WorkOrderFormData.fromJson(Map<String, dynamic>? m) {
 		if (m == null || m.isEmpty) return const WorkOrderFormData();
+		final mats = m["materials"];
+		final lab = m["labor"];
 		return WorkOrderFormData(
 			workDescription: WorkOrderPdfMetadata.str(m["workDescription"]),
 			tasksNews: WorkOrderPdfMetadata.str(m["tasksNews"]),
 			observations: WorkOrderPdfMetadata.str(m["observations"]),
+			materials: mats is List
+					? mats
+							.map((e) => OtMaterialRow.fromJson(Map<String, dynamic>.from(e as Map)))
+							.toList()
+					: const [],
+			labor: lab is List
+					? lab
+							.map((e) => OtLaborRow.fromJson(Map<String, dynamic>.from(e as Map)))
+							.toList()
+					: const [],
+			counterState: WorkOrderPdfMetadata.str(m["counterState"]),
+			startedAtIso: m["startedAt"]?.toString(),
+			finishedAtIso: m["finishedAt"]?.toString(),
 		);
 	}
+
+	DateTime? get startedAt => startedAtIso == null ? null : DateTime.tryParse(startedAtIso!);
+	DateTime? get finishedAt => finishedAtIso == null ? null : DateTime.tryParse(finishedAtIso!);
 }

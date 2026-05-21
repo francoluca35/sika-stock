@@ -5,6 +5,8 @@ import "package:pdf/widgets.dart" as pw;
 
 import "../../../core/format/argentina_datetime.dart";
 import "../domain/work_order.dart";
+import "../domain/work_order_check_item.dart";
+import "../domain/work_order_form_rows.dart";
 import "../domain/work_order_pdf_metadata.dart";
 
 /// PDF de cierre con datos de plantilla + lo completado por mantenimiento.
@@ -16,6 +18,7 @@ class WorkOrderPdfBuilder {
 		required WorkOrderFormData formData,
 		required DateTime startedAt,
 		required DateTime finishedAt,
+		List<WorkOrderCheckItem> checklist = const [],
 		Uint8List? signaturePng,
 	}) async {
 		final doc = pw.Document();
@@ -42,10 +45,26 @@ class WorkOrderPdfBuilder {
 					..._ro("Nº orden", metadata.orderNumber.isNotEmpty ? metadata.orderNumber : order.otNumber),
 					..._ro("Quien recibe", metadata.receiver),
 					..._ro("Tolerancia", metadata.tolerance),
+					..._ro("Procedimiento", metadata.procedure),
+					..._ro("Estado contador", OtCounterStates.label(formData.counterState)),
 					pw.SizedBox(height: 8),
 					..._ro("Fecha inicio", startAr),
 					..._ro("Fecha finalización", endAr),
 					..._ro("Técnico", assigneeName),
+					if (checklist.isNotEmpty) ...[
+						pw.SizedBox(height: 12),
+						pw.Text("Checklist / procedimiento", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+						pw.SizedBox(height: 4),
+						...checklist.map(
+							(item) => pw.Padding(
+								padding: const pw.EdgeInsets.only(bottom: 2),
+								child: pw.Text(
+									"${item.done ? "[x]" : "[ ]"} ${item.label}",
+									style: const pw.TextStyle(fontSize: 10),
+								),
+							),
+						),
+					],
 					pw.SizedBox(height: 12),
 					pw.Text("Descripción del trabajo", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
 					pw.SizedBox(height: 4),
@@ -58,6 +77,8 @@ class WorkOrderPdfBuilder {
 					pw.Text("Observaciones", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
 					pw.SizedBox(height: 4),
 					pw.Text(_block(formData.observations)),
+					..._materialsSection(formData.materials),
+					..._laborSection(formData.labor),
 					if (signaturePng != null && signaturePng.isNotEmpty) ...[
 						pw.SizedBox(height: 16),
 						pw.Text("Firma", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -69,6 +90,38 @@ class WorkOrderPdfBuilder {
 		);
 
 		return doc.save();
+	}
+
+	static List<pw.Widget> _materialsSection(List<OtMaterialRow> rows) {
+		final filled = rows.where((r) => r.description.trim().isNotEmpty || r.code.trim().isNotEmpty).toList();
+		if (filled.isEmpty) return [];
+		return [
+			pw.SizedBox(height: 12),
+			pw.Text("Materiales utilizados", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+			pw.SizedBox(height: 4),
+			...filled.map(
+				(r) => pw.Text(
+					"${r.date} · ${r.code} · ${r.quantity} ${r.unit} · ${r.description} · ${r.cost}",
+					style: const pw.TextStyle(fontSize: 9),
+				),
+			),
+		];
+	}
+
+	static List<pw.Widget> _laborSection(List<OtLaborRow> rows) {
+		final filled = rows.where((r) => r.name.trim().isNotEmpty).toList();
+		if (filled.isEmpty) return [];
+		return [
+			pw.SizedBox(height: 12),
+			pw.Text("Mano de obra", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+			pw.SizedBox(height: 4),
+			...filled.map(
+				(r) => pw.Text(
+					"${r.date} · ${r.name} · N:${r.normalHours} E:${r.extraHours} 100:${r.hours100} 200:${r.hours200}",
+					style: const pw.TextStyle(fontSize: 9),
+				),
+			),
+		];
 	}
 
 	static List<pw.Widget> _ro(String label, String? value) {
