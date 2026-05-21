@@ -140,7 +140,7 @@ class StockHomeScreen extends ConsumerWidget {
 						selectedIndex: null,
 						onPedido: () => context.push("/pedidos/nuevo"),
 						onHistorial: () => context.push("/pedidos/mis-pedidos"),
-						onPerfil: () => _stockHomeSoon(context, "Perfil"),
+						onPerfil: () => context.push("/configuracion"),
 					),
 				],
 			),

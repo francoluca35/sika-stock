@@ -31,6 +31,46 @@ class AuthRepository {
 		await _client.auth.resetPasswordForEmail(email.trim());
 	}
 
+	/// Actualiza nombre, usuario y correo (auth + `profiles`).
+	Future<void> updateOwnProfile({
+		required String nombre,
+		required String usuario,
+		required String email,
+	}) async {
+		final uid = _client.auth.currentUser?.id;
+		if (uid == null) throw Exception("Sin sesión");
+
+		final emailNorm = email.trim().toLowerCase();
+		final sessionEmail = _client.auth.currentUser?.email?.trim().toLowerCase();
+		if (sessionEmail != null && sessionEmail != emailNorm) {
+			await _client.auth.updateUser(UserAttributes(email: emailNorm));
+		}
+
+		await _client.from("profiles").update({
+			"nombre": nombre.trim(),
+			"usuario": usuario.trim(),
+			"email": emailNorm,
+		}).eq("id", uid);
+	}
+
+	/// Verifica la contraseña actual y asigna una nueva.
+	Future<void> updateOwnPassword({
+		required String currentPassword,
+		required String newPassword,
+	}) async {
+		final user = _client.auth.currentUser;
+		final email = user?.email?.trim();
+		if (email == null || email.isEmpty) {
+			throw Exception("No hay correo en la sesión");
+		}
+
+		await _client.auth.signInWithPassword(
+			email: email,
+			password: currentPassword,
+		);
+		await _client.auth.updateUser(UserAttributes(password: newPassword));
+	}
+
 	Future<ProfileRow?> fetchCurrentProfile() async {
 		final uid = _client.auth.currentUser?.id;
 		if (uid == null) return null;

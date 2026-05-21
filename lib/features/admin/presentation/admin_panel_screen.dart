@@ -108,6 +108,8 @@ class AdminPanelScreen extends ConsumerWidget {
 																context.push("/compras/historial-pedidos"),
 															onHistorialMantenimiento: () => context
 																.push("/supervisor/historial-pedidos"),
+															onOrdenesTrabajo: () =>
+																context.push("/admin/ordenes-trabajo"),
 														)
 													else
 														_DesktopActionGrid(
@@ -129,6 +131,8 @@ class AdminPanelScreen extends ConsumerWidget {
 																context.push("/compras/historial-pedidos"),
 															onHistorialMantenimiento: () => context
 																.push("/supervisor/historial-pedidos"),
+															onOrdenesTrabajo: () =>
+																context.push("/admin/ordenes-trabajo"),
 														),
 												],
 											),
@@ -141,8 +145,7 @@ class AdminPanelScreen extends ConsumerWidget {
 								onInicio: () {},
 								onOrdenCompra: () =>
 									_soon(context, "Crear orden de compra"),
-								onConfig: () =>
-									_soon(context, "Configuración"),
+								onConfig: () => context.push("/configuracion"),
 							),
 						],
 					),
@@ -321,6 +324,7 @@ class _DesktopActionGrid extends StatelessWidget {
 		required this.onSeguimientos,
 		required this.onHistorial,
 		required this.onHistorialMantenimiento,
+		required this.onOrdenesTrabajo,
 	});
 
 	final VoidCallback onCrearPerfil;
@@ -332,6 +336,7 @@ class _DesktopActionGrid extends StatelessWidget {
 	final VoidCallback onSeguimientos;
 	final VoidCallback onHistorial;
 	final VoidCallback onHistorialMantenimiento;
+	final VoidCallback onOrdenesTrabajo;
 
 	@override
 	Widget build(BuildContext context) {
@@ -390,6 +395,15 @@ class _DesktopActionGrid extends StatelessWidget {
 							subtitle: "Gestionar solicitudes de mantenimiento",
 							onTap: onPedidosMantenimiento,
 							pendingCount: pedidosMantenimientoPendientes,
+						),
+						_DesktopCard(
+							bg: AppTokens.blackNav,
+							fg: Colors.white,
+							icon: Icons.description_outlined,
+							title: "ÓRDENES DE TRABAJO",
+							subtitle: "Subir PDF, asignar a mantenimiento y recibir cierre",
+							onTap: onOrdenesTrabajo,
+							subtitleLight: true,
 						),
 						_DesktopCard(
 							bg: AppTokens.yellowHeader,
@@ -556,6 +570,7 @@ class _MobileActionList extends StatelessWidget {
 		required this.onSeguimientos,
 		required this.onHistorial,
 		required this.onHistorialMantenimiento,
+		required this.onOrdenesTrabajo,
 	});
 
 	final VoidCallback onCrearPerfil;
@@ -567,6 +582,7 @@ class _MobileActionList extends StatelessWidget {
 	final VoidCallback onSeguimientos;
 	final VoidCallback onHistorial;
 	final VoidCallback onHistorialMantenimiento;
+	final VoidCallback onOrdenesTrabajo;
 
 	@override
 	Widget build(BuildContext context) {
@@ -618,6 +634,16 @@ class _MobileActionList extends StatelessWidget {
 					subtitle: "Gestionar solicitudes de mantenimiento",
 					onTap: onPedidosMantenimiento,
 					trailingBadgeCount: pedidosMantenimientoPendientes,
+				),
+				const SizedBox(height: 12),
+				_MobileTile(
+					leadingBg: AppTokens.blackNav,
+					icon: Icons.description_outlined,
+					iconColor: Colors.white,
+					title: "ÓRDENES DE TRABAJO",
+					subtitle: "PDF, asignación y PDF completado para compartir",
+					onTap: onOrdenesTrabajo,
+					darkTile: true,
 				),
 				const SizedBox(height: 12),
 				_MobileTile(

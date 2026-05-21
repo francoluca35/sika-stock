@@ -621,7 +621,7 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 						bottomPadding: bottomInset,
 						onInicio: () => context.go("/home"),
 						onOrdenCompra: () => _soon(context, "Crear orden de compra"),
-						onConfig: () => _soon(context, "Configuración"),
+						onConfig: () => context.push("/configuracion"),
 					),
 				],
 			),

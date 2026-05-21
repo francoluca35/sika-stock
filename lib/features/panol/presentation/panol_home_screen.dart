@@ -182,9 +182,21 @@ class _PanolHomeHeader extends StatelessWidget {
 									],
 								),
 								onSelected: (value) async {
-									if (value == "logout") await onLogout();
+									if (value == "config") {
+										context.push("/configuracion");
+									} else if (value == "logout") {
+										await onLogout();
+									}
 								},
 								itemBuilder: (context) => [
+									const PopupMenuItem(
+										value: "config",
+										child: ListTile(
+											contentPadding: EdgeInsets.zero,
+											leading: Icon(Icons.settings_outlined, size: 22),
+											title: Text("Configuración"),
+										),
+									),
 									const PopupMenuItem(
 										value: "logout",
 										child: ListTile(

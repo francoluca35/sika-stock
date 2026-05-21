@@ -6,7 +6,11 @@ Ejecutá **una sola vez** en el proyecto de producción:
 
 Archivo: [`PRODUCTION_APPLY.sql`](./PRODUCTION_APPLY.sql)
 
-Incluye (en orden):
+**Órdenes de trabajo (nuevo):** ejecutá también  
+[`migrations/20260520400000_work_orders_module.sql`](./migrations/20260520400000_work_orders_module.sql)  
+(crea tablas, bucket `work-orders` y políticas).
+
+Incluye en `PRODUCTION_APPLY.sql` (si aún no lo actualizaste, corré las migraciones 203200–203400 por separado):
 
 1. Fix retiro pañol (RPC `complete_maintenance_order_with_inventory`, sin overload PGRST203)
 2. Fix Compras «Compra realizada» (RLS + estado `compras_purchase_done`)

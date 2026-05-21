@@ -127,9 +127,21 @@ class _ComprasHeader extends StatelessWidget {
 									offset: const Offset(0, 40),
 									icon: const Icon(Icons.more_vert, color: Colors.black87),
 									onSelected: (value) async {
-										if (value == "logout") await onLogout();
+										if (value == "config") {
+											context.push("/configuracion");
+										} else if (value == "logout") {
+											await onLogout();
+										}
 									},
 									itemBuilder: (context) => [
+										const PopupMenuItem(
+											value: "config",
+											child: ListTile(
+												contentPadding: EdgeInsets.zero,
+												leading: Icon(Icons.settings_outlined, size: 22),
+												title: Text("Configuración"),
+											),
+										),
 										const PopupMenuItem(
 											value: "logout",
 											child: ListTile(
@@ -470,11 +482,25 @@ class _ComprasPerfilTab extends StatelessWidget {
 						),
 						const SizedBox(height: 8),
 						Text(
-							"Opciones de cuenta — próximamente.",
+							"Editá tu nombre, usuario, correo y contraseña.",
 							textAlign: TextAlign.center,
 							style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
 						),
 						const SizedBox(height: 28),
+						SizedBox(
+							width: double.infinity,
+							height: 48,
+							child: FilledButton.icon(
+								style: FilledButton.styleFrom(
+									backgroundColor: AppTokens.redAction,
+									foregroundColor: Colors.white,
+								),
+								onPressed: () => context.push("/configuracion"),
+								icon: const Icon(Icons.settings_outlined),
+								label: const Text("Configuración"),
+							),
+						),
+						const SizedBox(height: 12),
 						OutlinedButton.icon(
 							onPressed: () async => onLogout(),
 							icon: const Icon(Icons.logout),
