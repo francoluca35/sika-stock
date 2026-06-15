@@ -4,6 +4,7 @@ import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../application/work_orders_providers.dart";
 import "../../domain/work_order.dart";
+import "../widgets/work_order_ot_lookup_screen.dart";
 import "work_order_admin_detail_screen.dart";
 import "work_order_new_screen.dart";
 
@@ -24,6 +25,19 @@ class WorkOrdersAdminScreen extends ConsumerWidget {
 					style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
 				),
 				actions: [
+					IconButton(
+						tooltip: "Buscar OT por código",
+						icon: const Icon(Icons.qr_code_scanner),
+						onPressed: () {
+							Navigator.of(context).push(
+								MaterialPageRoute(
+									builder: (_) => const WorkOrderOtLookupScreen(
+										mode: WorkOrderOtLookupMode.admin,
+									),
+								),
+							);
+						},
+					),
 					IconButton(
 						icon: const Icon(Icons.refresh),
 						onPressed: () => ref.invalidate(adminWorkOrdersProvider),

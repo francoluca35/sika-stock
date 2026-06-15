@@ -1,6 +1,7 @@
 import "package:flutter/material.dart";
 
 import "../../domain/work_order_pdf_metadata.dart";
+import "ot_form_theme.dart";
 
 class OtOrderInfoSection extends StatelessWidget {
 	const OtOrderInfoSection({
@@ -17,57 +18,78 @@ class OtOrderInfoSection extends StatelessWidget {
 		final nro = metadata.orderNumber.isNotEmpty
 				? metadata.orderNumber
 				: (otNumberFallback ?? "—");
+		final otChip = nro != "—" ? "OT #$nro" : "OT —";
 
 		return Column(
 			crossAxisAlignment: CrossAxisAlignment.stretch,
 			children: [
-						_infoTile("Nº orden", nro, highlight: true),
-						_infoTile("Tipo", metadata.orderType),
-						_infoTile("Fecha programación", metadata.date),
-						if (metadata.procedure.isNotEmpty)
-							_infoTile("Procedimiento N°", metadata.procedure),
-				_infoTile("Planta", metadata.plant),
-				_infoTile("Sector", metadata.sector, multiline: true),
-				_infoTile("Ubicación", metadata.location),
-				_infoTile("Responsable", metadata.responsible),
-				_infoTile("Solicitado por", metadata.requestedBy),
-				_infoTile("Prioridad", metadata.priority),
-				_infoTile("Tolerancia", metadata.tolerance),
-				_infoTile("Quien recibe", metadata.receiver),
+				Wrap(
+					spacing: 8,
+					runSpacing: 8,
+					children: [
+						OtFormChip(label: otChip),
+						if (metadata.orderType.isNotEmpty)
+							OtFormChip(
+								label: metadata.orderType,
+								variant: OtChipVariant.filledBlue,
+							),
+						if (metadata.date.isNotEmpty)
+							OtFormChip(
+								label: metadata.date,
+								variant: OtChipVariant.filledMuted,
+							),
+					],
+				),
+				const SizedBox(height: 14),
+				_infoGrid(),
 				if (!metadata.hasAnyData)
 					Padding(
-						padding: const EdgeInsets.only(top: 8),
+						padding: const EdgeInsets.only(top: 10),
 						child: Text(
 							"Algunos datos no se leyeron del PDF. Usá «Ver PDF original» arriba.",
-							style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+							style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
 						),
 					),
 			],
 		);
 	}
 
-	Widget _infoTile(String label, String value, {bool multiline = false, bool highlight = false}) {
-		final v = value.trim().isEmpty ? "—" : value.trim();
-		return Padding(
-			padding: const EdgeInsets.only(bottom: 10),
-			child: Column(
-				crossAxisAlignment: CrossAxisAlignment.start,
-				children: [
-					Text(label, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-					const SizedBox(height: 2),
-					Text(
-						v,
-						style: TextStyle(
-							fontSize: highlight ? 16 : 14,
-							fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
-							color: Colors.black87,
-							height: 1.25,
-						),
-						maxLines: multiline ? 20 : 3,
-						overflow: multiline ? null : TextOverflow.ellipsis,
+	Widget _infoGrid() {
+		final rows = <_InfoRow>[
+			_InfoRow("Procedimiento", metadata.procedure),
+			_InfoRow("Responsable", metadata.responsible),
+			_InfoRow("Planta", metadata.plant),
+			_InfoRow("Sector", metadata.sector),
+			_InfoRow("Ubicación", metadata.location),
+			_InfoRow("Solicitado por", metadata.requestedBy),
+			_InfoRow("Prioridad", metadata.priority),
+			_InfoRow("Tolerancia", metadata.tolerance),
+			_InfoRow("Quien recibe", metadata.receiver),
+		];
+
+		return Column(
+			children: rows.map((r) {
+				final v = r.value.trim().isEmpty ? "—" : r.value.trim();
+				return Padding(
+					padding: const EdgeInsets.only(bottom: 10),
+					child: Row(
+						crossAxisAlignment: CrossAxisAlignment.start,
+						children: [
+							SizedBox(
+								width: 118,
+								child: Text(r.label, style: OtFormTheme.label),
+							),
+							Expanded(child: Text(v, style: OtFormTheme.value)),
+						],
 					),
-				],
-			),
+				);
+			}).toList(),
 		);
 	}
+}
+
+class _InfoRow {
+	const _InfoRow(this.label, this.value);
+	final String label;
+	final String value;
 }

@@ -4,10 +4,24 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../application/work_orders_providers.dart";
+import "../widgets/work_order_ot_lookup_screen.dart";
 import "work_order_complete_screen.dart";
 
 class MyWorkOrdersScreen extends ConsumerWidget {
 	const MyWorkOrdersScreen({super.key});
+
+	Future<void> _openScanner(BuildContext context, WidgetRef ref) async {
+		final refreshed = await Navigator.of(context).push<bool>(
+			MaterialPageRoute(
+				builder: (_) => const WorkOrderOtLookupScreen(
+					mode: WorkOrderOtLookupMode.maintenance,
+				),
+			),
+		);
+		if (refreshed == true) {
+			ref.invalidate(myWorkOrderAssignmentsProvider);
+		}
+	}
 
 	@override
 	Widget build(BuildContext context, WidgetRef ref) {
@@ -24,10 +38,21 @@ class MyWorkOrdersScreen extends ConsumerWidget {
 				),
 				actions: [
 					IconButton(
+						tooltip: "Escanear código OT",
+						icon: const Icon(Icons.qr_code_scanner),
+						onPressed: () => _openScanner(context, ref),
+					),
+					IconButton(
 						icon: const Icon(Icons.refresh),
 						onPressed: () => ref.invalidate(myWorkOrderAssignmentsProvider),
 					),
 				],
+			),
+			floatingActionButton: FloatingActionButton.extended(
+				onPressed: () => _openScanner(context, ref),
+				backgroundColor: AppTokens.redAction,
+				icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+				label: const Text("Escanear OT", style: TextStyle(color: Colors.white)),
 			),
 			body: async.when(
 				data: (list) {

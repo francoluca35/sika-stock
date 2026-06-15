@@ -1,7 +1,8 @@
 import "package:flutter/material.dart";
 
+import "../../../../core/theme/app_tokens.dart";
 import "../../domain/work_order_form_rows.dart";
-import "ot_dynamic_row_field.dart";
+import "ot_form_theme.dart";
 
 class OtLaborEditor extends StatefulWidget {
 	const OtLaborEditor({
@@ -21,6 +22,9 @@ class OtLaborEditor extends StatefulWidget {
 
 class _OtLaborEditorState extends State<OtLaborEditor> {
 	final List<_LaborControllers> _ctrls = [];
+
+	static const _headers = ["Fecha", "Nombre", "H.N", "H.E", "100%", "200%"];
+	static const _minWidths = [88.0, 120.0, 48.0, 48.0, 48.0, 48.0];
 
 	@override
 	void initState() {
@@ -70,77 +74,113 @@ class _OtLaborEditorState extends State<OtLaborEditor> {
 	}
 
 	void _remove(int i) {
+		if (_ctrls.length <= 1) return;
 		setState(() {
 			_ctrls[i].dispose();
 			_ctrls.removeAt(i);
-			if (_ctrls.isEmpty) _ctrls.add(_LaborControllers.empty(_emit));
 		});
 		_emit();
 	}
 
 	@override
 	Widget build(BuildContext context) {
+		final tableWidth = _minWidths.fold<double>(0, (a, b) => a + b) + 40;
+
 		return Column(
 			crossAxisAlignment: CrossAxisAlignment.stretch,
 			children: [
-				...List.generate(_ctrls.length, (i) {
-					return Padding(
-						padding: const EdgeInsets.only(bottom: 14),
-						child: Material(
-							color: Colors.grey.shade50,
-							borderRadius: BorderRadius.circular(10),
-							child: Padding(
-								padding: const EdgeInsets.all(12),
-								child: Column(
-									crossAxisAlignment: CrossAxisAlignment.start,
-									children: [
-										Row(
-											children: [
-												Text(
-													"Mano de obra ${i + 1}",
-													style: const TextStyle(fontWeight: FontWeight.bold),
-												),
-												const Spacer(),
-												if (widget.enabled && _ctrls.length > 1)
-													OtRemoveRowButton(onPressed: () => _remove(i)),
-											],
-										),
-										const SizedBox(height: 8),
-										OtDynamicRowField(
-											label: "Fecha",
-											controller: _ctrls[i].date,
-											hint: "dd/mm/aaaa",
-										),
-										OtDynamicRowField(label: "Nombre", controller: _ctrls[i].name),
-										OtDynamicRowField(
-											label: "Hs. normal",
-											controller: _ctrls[i].normalHours,
-											keyboardType: const TextInputType.numberWithOptions(decimal: true),
-										),
-										OtDynamicRowField(
-											label: "Hs. extra",
-											controller: _ctrls[i].extraHours,
-											keyboardType: const TextInputType.numberWithOptions(decimal: true),
-										),
-										OtDynamicRowField(
-											label: "Hs. 100%",
-											controller: _ctrls[i].hours100,
-											keyboardType: const TextInputType.numberWithOptions(decimal: true),
-										),
-										OtDynamicRowField(
-											label: "Hs. 200%",
-											controller: _ctrls[i].hours200,
-											keyboardType: const TextInputType.numberWithOptions(decimal: true),
-										),
-									],
-								),
+				SingleChildScrollView(
+					scrollDirection: Axis.horizontal,
+					child: SizedBox(
+						width: tableWidth,
+						child: Column(
+							children: [
+								_headerRow(),
+								...List.generate(_ctrls.length, (i) => _dataRow(i)),
+							],
+						),
+					),
+				),
+				if (widget.enabled) ...[
+					const SizedBox(height: 12),
+					OutlinedButton.icon(
+						onPressed: () => _addEmpty(),
+						icon: const Icon(Icons.add, size: 20),
+						label: const Text(
+							"Agregar mano de obra",
+							style: TextStyle(fontWeight: FontWeight.w700),
+						),
+						style: OutlinedButton.styleFrom(
+							foregroundColor: AppTokens.redAction,
+							side: const BorderSide(color: AppTokens.redAction, width: 1.2),
+							padding: const EdgeInsets.symmetric(vertical: 14),
+						),
+					),
+				],
+			],
+		);
+	}
+
+	Widget _headerRow() {
+		return Container(
+			padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+			decoration: const BoxDecoration(
+				color: OtFormTheme.tableHeaderBg,
+				borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+			),
+			child: Row(
+				children: List.generate(_headers.length, (i) {
+					return SizedBox(
+						width: _minWidths[i],
+						child: Text(
+							_headers[i],
+							style: const TextStyle(
+								color: Colors.white,
+								fontWeight: FontWeight.w700,
+								fontSize: 11,
 							),
 						),
 					);
 				}),
-				if (widget.enabled)
-					OtAddRowButton(label: "AGREGAR MANO DE OBRA", onPressed: () => _addEmpty()),
-			],
+			),
+		);
+	}
+
+	Widget _dataRow(int i) {
+		final c = _ctrls[i];
+		final ctrls = [c.date, c.name, c.normalHours, c.extraHours, c.hours100, c.hours200];
+		return Container(
+			color: i.isOdd ? OtFormTheme.tableRowAlt : Colors.white,
+			padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+			child: Row(
+				children: [
+					...List.generate(6, (col) {
+						return SizedBox(
+							width: _minWidths[col],
+							child: widget.enabled
+									? TextField(
+											controller: ctrls[col],
+											style: const TextStyle(fontSize: 12),
+											keyboardType: col >= 2
+													? const TextInputType.numberWithOptions(decimal: true)
+													: TextInputType.text,
+											decoration: OtFormTheme.tableCellInput(),
+										)
+									: Text(
+											ctrls[col].text.isEmpty ? "—" : ctrls[col].text,
+											style: const TextStyle(fontSize: 12),
+										),
+						);
+					}),
+					if (widget.enabled && _ctrls.length > 1)
+						IconButton(
+							icon: const Icon(Icons.close, size: 18, color: AppTokens.redAction),
+							onPressed: () => _remove(i),
+							padding: EdgeInsets.zero,
+							constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+						),
+				],
+			),
 		);
 	}
 }

@@ -3,6 +3,7 @@ import "dart:typed_data";
 import "package:supabase_flutter/supabase_flutter.dart";
 
 import "../../auth/domain/profile_row.dart";
+import "../domain/ot_number_utils.dart";
 import "../domain/work_order.dart";
 import "../domain/work_order_check_item.dart";
 import "../domain/work_order_pdf_metadata.dart";
@@ -73,6 +74,104 @@ class WorkOrdersRepository {
 				.maybeSingle();
 		if (row == null) return null;
 		return WorkOrderAssignment.fromJson(Map<String, dynamic>.from(row));
+	}
+
+	/// Busca una asignación pendiente del usuario actual por código de barras o Nº OT.
+	Future<WorkOrderAssignment?> findMyPendingAssignmentByOtNumber(String raw) async {
+		final match = await _findMyAssignmentByOtNumber(raw, pendingOnly: true);
+		return match.assignment;
+	}
+
+	/// Cualquier asignación del usuario (para mensajes si ya fue enviada).
+	Future<({WorkOrderAssignment? assignment, bool alreadyCompleted})> lookupMyAssignmentByOtNumber(
+		String raw,
+	) async {
+		return _findMyAssignmentByOtNumber(raw, pendingOnly: false);
+	}
+
+	Future<({WorkOrderAssignment? assignment, bool alreadyCompleted})> _findMyAssignmentByOtNumber(
+		String raw, {
+		required bool pendingOnly,
+	}) async {
+		final uid = _client.auth.currentUser?.id;
+		if (uid == null) return (assignment: null, alreadyCompleted: false);
+		if (OtNumberUtils.normalizeCandidates(raw).isEmpty) {
+			return (assignment: null, alreadyCompleted: false);
+		}
+
+		var query = _client
+				.from("work_order_assignments")
+				.select("*, work_orders(*)")
+				.eq("user_id", uid);
+		if (pendingOnly) {
+			query = query.eq("status", "pending");
+		}
+		final rows = await query.order("assigned_at", ascending: false).limit(50);
+		final list = _mapAssignments(rows);
+
+		WorkOrderAssignment? pendingMatch;
+		WorkOrderAssignment? completedMatch;
+
+		for (final a in list) {
+			final wo = a.workOrder;
+			if (wo == null) continue;
+			if (!OtNumberUtils.workOrderMatches(
+					WorkOrderOtFields(
+						otNumber: wo.otNumber,
+						pdfOrderNumber: wo.pdfMetadata.orderNumber,
+					),
+					raw,
+				)) {
+				continue;
+			}
+			if (a.isPending) {
+				pendingMatch = a;
+				break;
+			}
+			completedMatch ??= a;
+		}
+
+		if (pendingMatch != null) {
+			return (assignment: pendingMatch, alreadyCompleted: false);
+		}
+		if (completedMatch != null) {
+			return (assignment: null, alreadyCompleted: true);
+		}
+		return (assignment: null, alreadyCompleted: false);
+	}
+
+	/// Admin: localiza OT por número (columna o metadata del PDF).
+	Future<WorkOrder?> findWorkOrderByOtNumber(String raw) async {
+		if (OtNumberUtils.normalizeCandidates(raw).isEmpty) return null;
+
+		for (final c in OtNumberUtils.normalizeCandidates(raw)) {
+			final row = await _client
+					.from("work_orders")
+					.select()
+					.eq("ot_number", c)
+					.maybeSingle();
+			if (row != null) {
+				return WorkOrder.fromJson(Map<String, dynamic>.from(row));
+			}
+		}
+
+		final rows = await _client
+				.from("work_orders")
+				.select()
+				.order("created_at", ascending: false)
+				.limit(200);
+		for (final wo in _mapWorkOrders(rows)) {
+			if (OtNumberUtils.workOrderMatches(
+					WorkOrderOtFields(
+						otNumber: wo.otNumber,
+						pdfOrderNumber: wo.pdfMetadata.orderNumber,
+					),
+					raw,
+				)) {
+				return wo;
+			}
+		}
+		return null;
 	}
 
 	Future<String> createWorkOrderWithAssignments({

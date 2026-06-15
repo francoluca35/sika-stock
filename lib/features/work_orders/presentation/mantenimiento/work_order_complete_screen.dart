@@ -12,11 +12,13 @@ import "../../data/work_order_pdf_metadata_parser.dart";
 import "../../domain/work_order_check_item.dart";
 import "../../domain/work_order_form_rows.dart";
 import "../../domain/work_order_pdf_metadata.dart";
+import "../widgets/ot_form_theme.dart";
 import "../widgets/ot_labor_editor.dart";
 import "../widgets/ot_materials_editor.dart";
 import "../widgets/ot_mobile_section_card.dart";
 import "../widgets/ot_order_info_section.dart";
 import "../widgets/ot_procedure_checklist.dart";
+import "../widgets/ot_work_description_panel.dart";
 import "../widgets/work_order_pdf_open.dart";
 import "../widgets/work_order_pdf_viewer_page.dart";
 import "../widgets/work_order_signature_field.dart";
@@ -280,18 +282,22 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 		required DateTime? value,
 		required VoidCallback onTap,
 	}) {
-		return ListTile(
-			contentPadding: EdgeInsets.zero,
-			title: Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
-			subtitle: Text(
-				value == null ? "Elegir fecha" : ArgentinaDateTime.formatDateOnly(value),
-				style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-			),
-			trailing: const Icon(Icons.calendar_today_outlined),
-			onTap: _sending ? null : onTap,
-			shape: RoundedRectangleBorder(
-				borderRadius: BorderRadius.circular(8),
-				side: BorderSide(color: Colors.grey.shade400),
+		return Material(
+			color: OtFormTheme.innerSurface,
+			borderRadius: BorderRadius.circular(8),
+			child: ListTile(
+				contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+				title: Text(label, style: OtFormTheme.label),
+				subtitle: Text(
+					value == null ? "Elegir fecha" : ArgentinaDateTime.formatDateOnly(value),
+					style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+				),
+				trailing: const Icon(Icons.calendar_today_outlined, color: AppTokens.redAction),
+				onTap: _sending ? null : onTap,
+				shape: RoundedRectangleBorder(
+					borderRadius: BorderRadius.circular(8),
+					side: const BorderSide(color: AppTokens.greyBorder),
+				),
 			),
 		);
 	}
@@ -310,74 +316,45 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 		}
 
 		final otLabel = _metadata.orderNumber.isNotEmpty
-				? "OT ${_metadata.orderNumber}"
-				: (_otNumber != null ? "OT $_otNumber" : "Orden de trabajo");
+				? "#${_metadata.orderNumber}"
+				: (_otNumber != null ? "#$_otNumber" : "—");
+		final company = _metadata.company.isNotEmpty ? _metadata.company : "SIKA S.A.I.C";
 
 		final form = ListView(
 			padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
 			children: [
-				Material(
-					color: AppTokens.yellowHeader.withValues(alpha: 0.35),
-					borderRadius: BorderRadius.circular(12),
-					child: Padding(
-						padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-						child: Row(
-							children: [
-								const Icon(Icons.assignment_outlined, size: 28),
-								const SizedBox(width: 10),
-								Expanded(
-									child: Column(
-										crossAxisAlignment: CrossAxisAlignment.start,
-										children: [
-											Text(
-												otLabel,
-												style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
-											),
-											Text(
-												"Checklist $_checklistDone/${_checklist.length}",
-												style: TextStyle(fontSize: 13, color: Colors.grey.shade800),
-											),
-										],
-									),
-								),
-							],
-						),
-					),
+				OtFormHeader(
+					company: company,
+					otLabel: "OT $otLabel",
+					checklistProgress: "Checklist $_checklistDone/${_checklist.length}",
 				),
 				const SizedBox(height: 12),
 				_pdfHeaderActions(),
 				const SizedBox(height: 16),
 				OtMobileSectionCard(
 					title: "Información de la orden",
-					icon: Icons.info_outline,
-					subtitle: "Datos leídos del PDF",
 					child: OtOrderInfoSection(metadata: _metadata, otNumberFallback: _otNumber),
 				),
 				const SizedBox(height: 12),
 				OtMobileSectionCard(
-					title: "Descripción y checklist",
-					icon: Icons.checklist_rtl,
-					subtitle: "Marcá cada paso del procedimiento",
-					trailingBadge: Chip(
-						label: Text("$_checklistDone/${_checklist.length}"),
-						padding: EdgeInsets.zero,
+					title: "Descripción del trabajo",
+					trailing: Chip(
+						label: Text(
+							"$_checklistDone/${_checklist.length}",
+							style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+						),
+						backgroundColor: const Color(0xFFFEE2E2),
+						labelStyle: const TextStyle(color: AppTokens.redAction),
+						padding: const EdgeInsets.symmetric(horizontal: 6),
 						materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
 					),
 					child: Column(
 						crossAxisAlignment: CrossAxisAlignment.stretch,
 						children: [
-							if (_metadata.workDescription.isNotEmpty) ...[
-								Text(
-									"Texto del PDF",
-									style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-								),
-								const SizedBox(height: 4),
-								Text(
-									_metadata.workDescription,
-									style: TextStyle(fontSize: 13, color: Colors.grey.shade800, height: 1.35),
-								),
-								const SizedBox(height: 14),
-							],
+							OtWorkDescriptionPanel(fullText: _metadata.workDescription),
+							const SizedBox(height: 14),
+							Text("Marcá los pasos realizados", style: OtFormTheme.label),
+							const SizedBox(height: 8),
 							OtProcedureChecklist(
 								items: _checklist,
 								enabled: !_sending,
@@ -387,21 +364,16 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 									});
 								},
 							),
-							const SizedBox(height: 16),
-							const Text(
-								"Trabajo realizado",
-								style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-							),
+							const SizedBox(height: 14),
+							Text("Detalle adicional (opcional)", style: OtFormTheme.label),
 							const SizedBox(height: 6),
 							TextField(
 								controller: _workDoneCtrl,
-								maxLines: 5,
+								maxLines: 4,
 								enabled: !_sending,
-								style: const TextStyle(fontSize: 15),
-								decoration: const InputDecoration(
-									hintText: "Detalle lo ejecutado en planta…",
-									border: OutlineInputBorder(),
-									alignLabelWithHint: true,
+								style: const TextStyle(fontSize: 14),
+								decoration: OtFormTheme.input(
+									hint: "Comentarios sobre el trabajo en planta…",
 								),
 							),
 						],
@@ -409,26 +381,22 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 				),
 				const SizedBox(height: 12),
 				OtMobileSectionCard(
-					title: "Novedades y tareas",
-					icon: Icons.note_alt_outlined,
-					initiallyExpanded: false,
+					title: "Novedades y tareas fuera de programa",
+					initiallyExpanded: true,
 					child: TextField(
 						controller: _tasksCtrl,
 						maxLines: 5,
 						enabled: !_sending,
-						style: const TextStyle(fontSize: 15),
-						decoration: const InputDecoration(
-							hintText: "Novedades, tareas fuera de programa, repuestos…",
-							border: OutlineInputBorder(),
-							alignLabelWithHint: true,
+						style: const TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+						decoration: OtFormTheme.input(
+							hint: "Ej.: Se detectó desgaste en goma superior…",
 						),
 					),
 				),
 				const SizedBox(height: 12),
 				OtMobileSectionCard(
 					title: "Materiales utilizados",
-					icon: Icons.inventory_2_outlined,
-					initiallyExpanded: false,
+					initiallyExpanded: true,
 					child: OtMaterialsEditor(
 						rows: _materials,
 						enabled: !_sending,
@@ -438,7 +406,6 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 				const SizedBox(height: 12),
 				OtMobileSectionCard(
 					title: "Mano de obra",
-					icon: Icons.engineering_outlined,
 					initiallyExpanded: false,
 					child: OtLaborEditor(
 						rows: _labor,
@@ -449,7 +416,6 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 				const SizedBox(height: 12),
 				OtMobileSectionCard(
 					title: "Cierre y firma",
-					icon: Icons.flag_outlined,
 					child: Column(
 						crossAxisAlignment: CrossAxisAlignment.stretch,
 						children: [
@@ -469,7 +435,7 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 							const SizedBox(height: 8),
 							DropdownButtonFormField<String>(
 								value: _counterState.isEmpty ? "" : _counterState,
-								decoration: const InputDecoration(border: OutlineInputBorder()),
+								decoration: OtFormTheme.input(label: "Seleccionar"),
 								items: OtCounterStates.options
 										.map(
 											(v) => DropdownMenuItem(
@@ -487,11 +453,8 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 								controller: _obsCtrl,
 								maxLines: 3,
 								enabled: !_sending,
-								style: const TextStyle(fontSize: 15),
-								decoration: const InputDecoration(
-									labelText: "Observaciones",
-									border: OutlineInputBorder(),
-								),
+								style: const TextStyle(fontSize: 14),
+								decoration: OtFormTheme.input(label: "Observaciones"),
 							),
 							const SizedBox(height: 12),
 							OutlinedButton.icon(
@@ -562,7 +525,7 @@ class _WorkOrderCompleteScreenState extends ConsumerState<WorkOrderCompleteScree
 				backgroundColor: AppTokens.yellowHeader,
 				foregroundColor: Colors.black87,
 				title: Text(
-					otLabel,
+					"OT $otLabel",
 					style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
 				),
 			),

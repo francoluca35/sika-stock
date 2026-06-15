@@ -1,12 +1,15 @@
 import "dart:typed_data";
 
+import "package:flutter/foundation.dart" show kIsWeb;
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:share_plus/share_plus.dart";
 
+import "../../../../core/files/save_bytes_file.dart";
 import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../application/work_orders_providers.dart";
+import "../../domain/work_order.dart";
 import "../widgets/work_order_pdf_panel.dart";
 
 class WorkOrderAdminDetailScreen extends ConsumerStatefulWidget {
@@ -22,6 +25,7 @@ class WorkOrderAdminDetailScreen extends ConsumerStatefulWidget {
 class _WorkOrderAdminDetailScreenState extends ConsumerState<WorkOrderAdminDetailScreen> {
 	Uint8List? _originalPdf;
 	bool _loadingPdf = false;
+	final Set<String> _downloadingPaths = {};
 
 	@override
 	void initState() {
@@ -43,9 +47,22 @@ class _WorkOrderAdminDetailScreenState extends ConsumerState<WorkOrderAdminDetai
 		}
 	}
 
+	Future<Uint8List> _fetchPdfBytes(String path) {
+		return ref.read(workOrdersRepositoryProvider).downloadStorageBytes(path);
+	}
+
+	String _completedPdfFilename(WorkOrder wo, String? assigneeName) {
+		final ot = wo.otNumber?.trim();
+		final base = (ot != null && ot.isNotEmpty) ? "OT-$ot" : "OT-${wo.id.substring(0, 8)}";
+		final tech = (assigneeName ?? "").trim();
+		if (tech.isEmpty) return "$base-completada.pdf";
+		final safeTech = tech.replaceAll(RegExp(r'[\\/:*?"<>|]'), "_");
+		return "$base-$safeTech-completada.pdf";
+	}
+
 	Future<void> _sharePdf(String path, String name) async {
 		try {
-			final bytes = await ref.read(workOrdersRepositoryProvider).downloadStorageBytes(path);
+			final bytes = await _fetchPdfBytes(path);
 			await Share.shareXFiles(
 				[
 					XFile.fromData(
@@ -61,6 +78,33 @@ class _WorkOrderAdminDetailScreenState extends ConsumerState<WorkOrderAdminDetai
 			ScaffoldMessenger.of(context).showSnackBar(
 				SnackBar(content: Text("No se pudo compartir: $e")),
 			);
+		}
+	}
+
+	Future<void> _downloadPdf(String path, String name) async {
+		if (_downloadingPaths.contains(path)) return;
+		setState(() => _downloadingPaths.add(path));
+		try {
+			final bytes = await _fetchPdfBytes(path);
+			final saved = await saveBytesToDevice(
+				bytes: bytes,
+				filename: name,
+				mimeType: "application/pdf",
+			);
+			if (!mounted) return;
+			final msg = kIsWeb
+					? "Descarga iniciada: $name"
+					: saved != null
+							? "PDF guardado en Descargas"
+							: "PDF descargado";
+			ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+		} catch (e) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudo descargar: $e")),
+			);
+		} finally {
+			if (mounted) setState(() => _downloadingPaths.remove(path));
 		}
 	}
 
@@ -176,13 +220,43 @@ class _WorkOrderAdminDetailScreenState extends ConsumerState<WorkOrderAdminDetai
 																],
 																if (pdfPath != null) ...[
 																	const SizedBox(height: 8),
-																	OutlinedButton.icon(
-																		onPressed: () => _sharePdf(
-																			pdfPath,
-																			"OT-${wo.otNumber ?? wo.id.substring(0, 8)}-completada.pdf",
-																		),
-																		icon: const Icon(Icons.share, size: 18),
-																		label: const Text("Compartir PDF cierre"),
+																	Builder(
+																		builder: (context) {
+																			final fileName = _completedPdfFilename(
+																				wo,
+																				a.assigneeName,
+																			);
+																			final downloading = _downloadingPaths.contains(pdfPath);
+																			return Row(
+																				children: [
+																					Expanded(
+																						child: OutlinedButton.icon(
+																							onPressed: downloading
+																									? null
+																									: () => _downloadPdf(pdfPath, fileName),
+																							icon: downloading
+																									? const SizedBox(
+																											width: 18,
+																											height: 18,
+																											child: CircularProgressIndicator(strokeWidth: 2),
+																										)
+																									: const Icon(Icons.download, size: 18),
+																							label: const Text("Descargar"),
+																						),
+																					),
+																					const SizedBox(width: 8),
+																					Expanded(
+																						child: OutlinedButton.icon(
+																							onPressed: downloading
+																									? null
+																									: () => _sharePdf(pdfPath, fileName),
+																							icon: const Icon(Icons.share, size: 18),
+																							label: const Text("Compartir"),
+																						),
+																					),
+																				],
+																			);
+																		},
 																	),
 																],
 															],
