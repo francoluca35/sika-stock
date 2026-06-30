@@ -13,7 +13,7 @@ import "../../stock/domain/stock_product.dart";
 import "../../orders/application/mantenimiento_notificaciones_provider.dart";
 import "../application/maintenance_orders_provider.dart";
 import "../application/maintenance_stock_similarity.dart"
-		show analizarStockLineaExacta, analizarStockPedido;
+		show analizarStockLineaExacta, analizarStockPedido, stockSimilarToPedido;
 import "../domain/maintenance_order.dart";
 
 /// Tabla de **pedidos de mantenimiento** para supervisor (lista mockup).
@@ -101,6 +101,26 @@ class _SupervisorMaintenanceOrdersScreenState
     return analizarStockPedido(o, catalog);
   }
 
+  (String label, Color bg, Color fg) _estadoVisual(
+    MaintenanceOrder o,
+    ({bool haySuficiente, StockProduct? match, int disponible}) analisis,
+  ) {
+    if (o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor) {
+      if (analisis.haySuficiente && analisis.match != null) {
+        return ("ESPERA SUPERVISOR", AppTokens.yellowHeader, Colors.black87);
+      }
+      final label =
+          analisis.match != null ? "SIN STOCK" : "SIN COINCIDENCIA";
+      return (label, Colors.orange.shade800, Colors.white);
+    }
+    final colors = SupervisorMaintenanceOrdersScreen._workflowBadgeColors(o);
+    return (
+      SupervisorMaintenanceOrdersScreen._workflowBadgeLabel(o),
+      colors.$1,
+      colors.$2,
+    );
+  }
+
   bool _puedeElegirLineaStock(MaintenanceOrder o) {
     return o.workflowStatus == MaintenanceWorkflowStatus.pendingSupervisor;
   }
@@ -159,14 +179,14 @@ class _SupervisorMaintenanceOrdersScreenState
             foreground: Colors.white,
             onPressed: () => _confirmarRetiroOk(context, o, catalog),
           ),
-        ] else if (!analisis.haySuficiente) ...[
+        ] else ...[
           Padding(
             padding: const EdgeInsets.only(top: 2, right: 4),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 160),
               child: Text(
                 analisis.match != null
-                    ? "Sin stock suficiente"
+                    ? "Coincide · sin stock"
                     : "Sin coincidencia · pañol",
                 style: TextStyle(
                   fontSize: 10,
@@ -184,18 +204,7 @@ class _SupervisorMaintenanceOrdersScreenState
             foreground: Colors.white,
             onPressed: () => _decidirStock(context, o, hayStock: false),
           ),
-        ] else if (analisis.haySuficiente && analisis.match == null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2, right: 4),
-            child: Text(
-              "Usá ELEGIR y RETIRO OK",
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: Colors.orange.shade900,
-              ),
-            ),
-          ),
+        ],
       ],
       if (o.workflowStatus == MaintenanceWorkflowStatus.supervisorStockOk ||
           o.workflowStatus == MaintenanceWorkflowStatus.comprasArrivedNotified)
@@ -241,12 +250,21 @@ class _SupervisorMaintenanceOrdersScreenState
             builder: (ctx, setModal) {
               List<StockProduct> filtrar() {
                 final q = buscar.text.trim().toLowerCase();
-                final list = catalog.where((p) {
+                bool coincideBusqueda(StockProduct p) {
                   if (q.isEmpty) return true;
                   return p.nombre.toLowerCase().contains(q) ||
                       p.categoria.toLowerCase().contains(q) ||
                       (p.codigo ?? "").toLowerCase().contains(q);
-                }).toList();
+                }
+
+                final similares = stockSimilarToPedido(o.producto, catalog)
+                    .where(coincideBusqueda)
+                    .toList();
+                if (q.isEmpty) return similares;
+
+                if (similares.isNotEmpty) return similares;
+
+                final list = catalog.where(coincideBusqueda).toList();
                 list.sort(
                   (a, b) =>
                       a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()),
@@ -255,6 +273,8 @@ class _SupervisorMaintenanceOrdersScreenState
               }
 
               final listado = filtrar();
+              final mostrandoSimilares =
+                  buscar.text.trim().isEmpty && listado.isNotEmpty;
               final h = MediaQuery.sizeOf(ctx).height * 0.72;
               return Padding(
                 padding: EdgeInsets.only(
@@ -280,14 +300,39 @@ class _SupervisorMaintenanceOrdersScreenState
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: TextField(
                           controller: buscar,
-                          decoration: const InputDecoration(
-                            labelText: "Buscar",
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: "Buscar en catálogo",
+                            hintText: o.producto,
+                            border: const OutlineInputBorder(),
                             isDense: true,
                           ),
                           onChanged: (_) => setModal(() {}),
                         ),
                       ),
+                      if (mostrandoSimilares)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Text(
+                            "Productos similares al pedido «${o.producto}».",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade700,
+                              height: 1.3,
+                            ),
+                          ),
+                        )
+                      else if (buscar.text.trim().isEmpty && listado.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: Text(
+                            "Sin coincidencias automáticas. Buscá por nombre, código o categoría.",
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange.shade900,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
                       const SizedBox(height: 8),
                       Expanded(
                         child: ListView.builder(
@@ -394,8 +439,7 @@ class _SupervisorMaintenanceOrdersScreenState
       ),
       builder: (ctx) {
         final bottom = MediaQuery.paddingOf(ctx).bottom;
-        final (ebg, efg) =
-            SupervisorMaintenanceOrdersScreen._workflowBadgeColors(order);
+        final (estadoLabel, ebg, efg) = _estadoVisual(order, analisis);
         return Padding(
           padding: EdgeInsets.only(
             left: 20,
@@ -479,9 +523,7 @@ class _SupervisorMaintenanceOrdersScreenState
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: _EstadoChip(
-                            label: SupervisorMaintenanceOrdersScreen._workflowBadgeLabel(
-                              o,
-                            ),
+                            label: estadoLabel,
                             background: ebg,
                             foreground: efg,
                           ),
@@ -793,63 +835,66 @@ class _SupervisorMaintenanceOrdersScreenState
         ),
       ),
       data: (pedidos) {
-        return catalogAsync.when(
-          loading: () => Scaffold(
-            backgroundColor: AppTokens.surfacePage,
-            body: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                StockScreenHeader(
-                  title: "PEDIDOS DE MANTENIMIENTO",
-                  onBack: () => _onBack(context),
-                  onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
-                ),
-                const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-              ],
+        final catalog = catalogAsync.asData?.value;
+        if (catalog == null) {
+          return catalogAsync.when(
+            loading: () => Scaffold(
+              backgroundColor: AppTokens.surfacePage,
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  StockScreenHeader(
+                    title: "PEDIDOS DE MANTENIMIENTO",
+                    onBack: () => _onBack(context),
+                    onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
+                  ),
+                  const Expanded(
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ],
+              ),
             ),
-          ),
-          error: (e, _) => Scaffold(
-            backgroundColor: AppTokens.surfacePage,
-            body: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                StockScreenHeader(
-                  title: "PEDIDOS DE MANTENIMIENTO",
-                  onBack: () => _onBack(context),
-                  onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
-                ),
-                Expanded(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            "No se pudo cargar el catálogo de stock.\n$e",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey.shade800),
-                          ),
-                          const SizedBox(height: 12),
-                          FilledButton(
-                            onPressed: () => ref.invalidate(
-                              supervisorStockCatalogProvider,
+            error: (e, _) => Scaffold(
+              backgroundColor: AppTokens.surfacePage,
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  StockScreenHeader(
+                    title: "PEDIDOS DE MANTENIMIENTO",
+                    onBack: () => _onBack(context),
+                    onRefresh: () => ScreenRefresh.pedidosSupervisor(ref),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              "No se pudo cargar el catálogo de stock.\n$e",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey.shade800),
                             ),
-                            child: const Text("Reintentar"),
-                          ),
-                        ],
+                            const SizedBox(height: 12),
+                            FilledButton(
+                              onPressed: () => ScreenRefresh.stock(ref),
+                              child: const Text("Reintentar"),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          data: (catalog) {
-            final n = pedidos.length;
-            return Scaffold(
+            data: (_) => const SizedBox.shrink(),
+          );
+        }
+
+        final n = pedidos.length;
+        return Scaffold(
       backgroundColor: AppTokens.surfacePage,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -943,9 +988,10 @@ class _SupervisorMaintenanceOrdersScreenState
                                     for (var i = 0; i < pedidos.length; i++)
                                       () {
                                         final fila = pedidos[i];
-                                        final (ebg, efg) =
-                                            SupervisorMaintenanceOrdersScreen
-                                                ._workflowBadgeColors(fila);
+                                        final analisis =
+                                            _analisisParaOrden(fila, catalog);
+                                        final (estadoLabel, ebg, efg) =
+                                            _estadoVisual(fila, analisis);
                                         return TableRow(
                                           decoration: BoxDecoration(
                                             color: i.isEven
@@ -971,11 +1017,7 @@ class _SupervisorMaintenanceOrdersScreenState
                                               child: Align(
                                                 alignment: Alignment.centerLeft,
                                                 child: _EstadoChip(
-                                                  label:
-                                                      SupervisorMaintenanceOrdersScreen
-                                                          ._workflowBadgeLabel(
-                                                    fila,
-                                                  ),
+                                                  label: estadoLabel,
                                                   background: ebg,
                                                   foreground: efg,
                                                 ),
@@ -1011,23 +1053,18 @@ class _SupervisorMaintenanceOrdersScreenState
                                 const SizedBox(height: 10),
                             itemBuilder: (context, index) {
                               final o = pedidos[index];
+                              final analisis = _analisisParaOrden(o, catalog);
+                              final (estadoLabel, estadoBg, estadoFg) =
+                                  _estadoVisual(o, analisis);
                               return _MobileMaintenanceOrderCard(
                                 index: index,
                                 order: o,
                                 fechaText:
                                 SupervisorMaintenanceOrdersScreen._formatFecha(
                                     o.fechaPedido),
-                                estadoLabel:
-                                    SupervisorMaintenanceOrdersScreen
-                                        ._workflowBadgeLabel(o),
-                                estadoBg:
-                                    SupervisorMaintenanceOrdersScreen
-                                        ._workflowBadgeColors(o)
-                                        .$1,
-                                estadoFg:
-                                    SupervisorMaintenanceOrdersScreen
-                                        ._workflowBadgeColors(o)
-                                        .$2,
+                                estadoLabel: estadoLabel,
+                                estadoBg: estadoBg,
+                                estadoFg: estadoFg,
                                 onVer: () => _mostrarDetalle(context, o),
                                 footerActions: _mobileFooterActions(context, o, catalog),
                               );
@@ -1056,8 +1093,6 @@ class _SupervisorMaintenanceOrdersScreenState
         ],
       ),
     );
-          },
-        );
       },
     );
   }
