@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../supervisor/domain/maintenance_order.dart";
+import "maintenance_order_photo_dialog.dart";
 
 /// Modal con el detalle completo de un pedido de mantenimiento.
 void showMaintenanceOrderDetalleDialog(
@@ -61,23 +62,10 @@ void showMaintenanceOrderDetalleDialog(
 							const SizedBox(height: 6),
 							ClipRRect(
 								borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-								child: Image.network(
-									order.imagenUrl!,
+								child: MaintenanceOrderPhotoView(
+									imageUrl: order.imagenUrl!,
 									height: 140,
-									width: double.infinity,
 									fit: BoxFit.cover,
-									errorBuilder: (_, __, ___) => Container(
-										height: 80,
-										color: AppTokens.surfaceMuted,
-										alignment: Alignment.center,
-										child: Text(
-											"No se pudo cargar la imagen",
-											style: TextStyle(
-												fontSize: 12,
-												color: Colors.grey.shade700,
-											),
-										),
-									),
 								),
 							),
 						],

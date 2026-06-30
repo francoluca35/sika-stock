@@ -6,6 +6,7 @@ import "package:go_router/go_router.dart";
 import "package:intl/intl.dart";
 
 import "../../../core/theme/app_tokens.dart";
+import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
 import "../../auth/domain/profile_row.dart";
 import "../application/admin_providers.dart";
@@ -66,6 +67,97 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 		ScaffoldMessenger.of(context).showSnackBar(
 			SnackBar(content: Text("$feature — próximamente.")),
 		);
+	}
+
+	bool _blockedForCaller(AppRole? caller, ProfileRow target) {
+		final tr = target.rol;
+		if (tr != AppRole.admin && tr != AppRole.superadmin) {
+			return false;
+		}
+		return caller != AppRole.superadmin;
+	}
+
+	String _displayName(ProfileRow p) {
+		final n = p.nombre?.trim();
+		if (n != null && n.isNotEmpty) return n;
+		return p.email ?? p.usuario ?? "este usuario";
+	}
+
+	Future<void> _confirmAndDeleteUser(BuildContext context, ProfileRow target) async {
+		final caller = await ref.read(currentProfileProvider.future);
+		final callerRol = caller?.rol;
+
+		if (callerRol != AppRole.admin && callerRol != AppRole.superadmin) {
+			if (!context.mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(content: Text("No tenés permisos para eliminar usuarios.")),
+			);
+			return;
+		}
+
+		if (_blockedForCaller(callerRol, target)) {
+			if (!context.mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(
+					content: Text(
+						"Solo un usuario SUPERADMIN puede eliminar cuentas con rol ADMIN o SUPERADMIN.",
+					),
+				),
+			);
+			return;
+		}
+
+		final currentUserId = ref.read(supabaseClientProvider).auth.currentUser?.id;
+		if (currentUserId != null && currentUserId == target.id) {
+			if (!context.mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(content: Text("No podés eliminar tu propia cuenta.")),
+			);
+			return;
+		}
+
+		final name = _displayName(target);
+		if (!context.mounted) return;
+		final confirmed = await showDialog<bool>(
+			context: context,
+			builder: (ctx) => AlertDialog(
+				title: const Text("Eliminar usuario"),
+				content: Text(
+					"¿Estás seguro de que querés eliminar a $name?\n\nEsta acción no se puede deshacer.",
+				),
+				actions: [
+					TextButton(
+						onPressed: () => Navigator.pop(ctx, false),
+						child: const Text("Cancelar"),
+					),
+					FilledButton(
+						style: FilledButton.styleFrom(
+							backgroundColor: AppTokens.redAction,
+							foregroundColor: Colors.white,
+						),
+						onPressed: () => Navigator.pop(ctx, true),
+						child: const Text("Eliminar"),
+					),
+				],
+			),
+		);
+
+		if (confirmed != true || !context.mounted) return;
+
+		try {
+			await ref.read(adminUsersRepositoryProvider).deleteUser(userId: target.id);
+			if (!context.mounted) return;
+			ref.invalidate(usersListProvider);
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("Usuario $name eliminado correctamente.")),
+			);
+		} catch (e) {
+			if (!context.mounted) return;
+			final msg = e.toString().replaceFirst(RegExp(r"^Exception:\s*"), "");
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text(msg)),
+			);
+		}
 	}
 
 	List<ProfileRow> _filter(List<ProfileRow> all, String query) {
@@ -545,9 +637,9 @@ class _UsersListScreenState extends ConsumerState<UsersListScreen> {
 																															Navigator.pop(
 																																c,
 																															);
-																															_soon(
+																															_confirmAndDeleteUser(
 																																ctx,
-																																"Eliminar usuario",
+																																pageItems[i],
 																															);
 																														},
 																													),

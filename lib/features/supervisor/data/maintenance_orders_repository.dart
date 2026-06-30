@@ -1,3 +1,6 @@
+import "dart:math";
+import "dart:typed_data";
+
 import "package:supabase_flutter/supabase_flutter.dart";
 
 import "../domain/maintenance_order.dart";
@@ -8,6 +11,8 @@ class MaintenanceOrdersRepository {
 
 	final SupabaseClient _client;
 
+	static const String _photoBucket = "maintenance-order-photos";
+
 	Future<void> createOrder({
 		required String solicitanteDisplay,
 		required String productName,
@@ -15,6 +20,7 @@ class MaintenanceOrdersRepository {
 		required String productType,
 		required String priority,
 		required String destination,
+		Uint8List? photoJpeg,
 	}) async {
 		await createOrderReturningId(
 			solicitanteDisplay: solicitanteDisplay,
@@ -23,6 +29,7 @@ class MaintenanceOrdersRepository {
 			productType: productType,
 			priority: priority,
 			destination: destination,
+			photoJpeg: photoJpeg,
 		);
 	}
 
@@ -34,25 +41,108 @@ class MaintenanceOrdersRepository {
 		required String productType,
 		required String priority,
 		required String destination,
+		Uint8List? photoJpeg,
 	}) async {
 		final uid = _client.auth.currentUser?.id;
 		if (uid == null) {
 			throw Exception("No hay sesión");
 		}
-		final row = await _client
-				.from("maintenance_orders")
-				.insert({
-					"created_by": uid,
-					"solicitante_display": solicitanteDisplay,
-					"product_name": productName,
-					"quantity": quantity,
-					"product_type": productType,
-					"priority": priority,
-					"destination": destination,
-				})
-				.select("id")
-				.single();
-		return row["id"] as String;
+
+		final orderId = _generateUuidV4();
+		String? imagenUrl;
+		if (photoJpeg != null && photoJpeg.isNotEmpty) {
+			imagenUrl = await _uploadOrderPhoto(
+				userId: uid,
+				orderId: orderId,
+				jpeg: photoJpeg,
+			);
+		}
+
+		final payload = <String, dynamic>{
+			"id": orderId,
+			"created_by": uid,
+			"solicitante_display": solicitanteDisplay,
+			"product_name": productName,
+			"quantity": quantity,
+			"product_type": productType,
+			"priority": priority,
+			"destination": destination,
+		};
+		if (imagenUrl != null) {
+			payload["imagen_url"] = imagenUrl;
+		}
+
+		await _client.from("maintenance_orders").insert(payload).select("id").single();
+
+		return orderId;
+	}
+
+	/// URL de la foto del pedido (columna BD o archivo en Storage si la URL no se guardó).
+	Future<String?> resolveOrderPhotoUrl(MaintenanceOrder order) async {
+		final stored = order.imagenUrl?.trim();
+		if (stored != null && stored.isNotEmpty) {
+			return stored;
+		}
+
+		final creator = order.createdBy?.trim();
+		if (creator == null || creator.isEmpty) {
+			return null;
+		}
+
+		final path = "$creator/${order.id}.jpg";
+		try {
+			final files = await _client.storage.from(_photoBucket).list(
+				path: creator,
+				searchOptions: SearchOptions(
+					search: "${order.id}.jpg",
+					limit: 1,
+				),
+			);
+			if (files.isEmpty) {
+				return null;
+			}
+			return _client.storage.from(_photoBucket).getPublicUrl(path);
+		} catch (_) {
+			return null;
+		}
+	}
+
+	static String _generateUuidV4() {
+		final random = Random.secure();
+		final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+		bytes[6] = (bytes[6] & 0x0f) | 0x40;
+		bytes[8] = (bytes[8] & 0x3f) | 0x80;
+		String b(int i) => bytes[i].toRadixString(16).padLeft(2, "0");
+		return "${b(0)}${b(1)}${b(2)}${b(3)}-${b(4)}${b(5)}-${b(6)}${b(7)}"
+			"-${b(8)}${b(9)}-${b(10)}${b(11)}${b(12)}${b(13)}${b(14)}${b(15)}";
+	}
+
+	Future<String> _uploadOrderPhoto({
+		required String userId,
+		required String orderId,
+		required Uint8List jpeg,
+	}) async {
+		final path = "$userId/$orderId.jpg";
+		try {
+			await _client.storage.from(_photoBucket).uploadBinary(
+				path,
+				jpeg,
+				fileOptions: const FileOptions(
+					contentType: "image/jpeg",
+					upsert: true,
+				),
+			);
+		} on StorageException catch (e) {
+			if (e.statusCode == 403 || (e.message).toLowerCase().contains("row-level security")) {
+				throw Exception(
+					"No se pudo subir la foto: faltan permisos en Supabase Storage. "
+					"Ejecutá en el SQL Editor la migración "
+					"20260623140000_maintenance_order_photos_storage_rls_fix.sql",
+				);
+			}
+			rethrow;
+		}
+		return _client.storage.from(_photoBucket).getPublicUrl(path);
 	}
 
 	Future<MaintenanceOrder?> fetchOrderById(String id) async {

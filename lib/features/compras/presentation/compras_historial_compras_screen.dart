@@ -292,13 +292,12 @@ class _ComprasHistorialComprasScreenState
 			160.0,
 			minTableWidth - reservaSinProducto,
 		);
-		return Scrollbar(
-			child: SingleChildScrollView(
-				scrollDirection: Axis.horizontal,
-				child: ConstrainedBox(
-					constraints: BoxConstraints(minWidth: minTableWidth),
-					child: SingleChildScrollView(
-						child: DataTable(
+		return SingleChildScrollView(
+			scrollDirection: Axis.horizontal,
+			child: ConstrainedBox(
+				constraints: BoxConstraints(minWidth: minTableWidth),
+				child: SingleChildScrollView(
+					child: DataTable(
 								headingRowColor: WidgetStateProperty.all(
 									AppTokens.yellowHeader,
 								),
@@ -380,7 +379,6 @@ class _ComprasHistorialComprasScreenState
 										),
 								],
 							),
-						),
 					),
 				),
 		);
@@ -543,20 +541,18 @@ class _ComprasHistorialComprasScreenState
 														_compraCardMovil(paginaItems[i]),
 											);
 										}
-										return Scrollbar(
-											child: SingleChildScrollView(
-												padding: EdgeInsets.fromLTRB(
-													pad.left,
-													0,
-													pad.right,
-													16,
-												),
-												child: _tablaComprasDesktop(
-													paginaItems,
-													math.max(
-														0.0,
-														constraints.maxWidth - pad.horizontal,
-													),
+										return SingleChildScrollView(
+											padding: EdgeInsets.fromLTRB(
+												pad.left,
+												0,
+												pad.right,
+												16,
+											),
+											child: _tablaComprasDesktop(
+												paginaItems,
+												math.max(
+													0.0,
+													constraints.maxWidth - pad.horizontal,
 												),
 											),
 										);

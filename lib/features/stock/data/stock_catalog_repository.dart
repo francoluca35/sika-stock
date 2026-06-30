@@ -11,11 +11,26 @@ class StockCatalogRepository {
 			"id, nombre, categoria, cantidad, cantidad_minima, cantidad_maxima, codigo, descripcion_empresa, descripcion_fabricante, marca";
 
 	Future<List<StockProduct>> fetchAll() async {
-		final raw = await _client.from("stock_items").select(_selectCols).order("nombre");
-		final list = raw as List? ?? [];
-		return list
-				.map((e) => StockProduct.fromJson(Map<String, dynamic>.from(e as Map)))
-				.toList();
+		const pageSize = 1000;
+		var offset = 0;
+		final all = <StockProduct>[];
+		while (true) {
+			final raw = await _client
+					.from("stock_items")
+					.select(_selectCols)
+					.order("nombre")
+					.range(offset, offset + pageSize - 1);
+			final page = raw as List? ?? [];
+			if (page.isEmpty) break;
+			all.addAll(
+				page.map(
+					(e) => StockProduct.fromJson(Map<String, dynamic>.from(e as Map)),
+				),
+			);
+			if (page.length < pageSize) break;
+			offset += pageSize;
+		}
+		return all;
 	}
 
 	Future<StockProduct?> fetchById(String id) async {

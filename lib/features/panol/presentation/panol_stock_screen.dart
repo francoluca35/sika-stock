@@ -4,10 +4,12 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
 import "../../../core/refresh/screen_refresh.dart";
+import "../../../core/theme/app_scroll_behavior.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/app_role.dart";
 import "../../auth/domain/profile_row.dart";
+import "../../compras/presentation/widgets/compras_pagination_bar.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/presentation/widgets/stock_excel_import_dialog.dart";
 import "../../stock/domain/stock_product.dart";
@@ -42,9 +44,12 @@ class PanolStockScreen extends ConsumerStatefulWidget {
 }
 
 class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
+	static const _itemsPorPagina = 150;
+
 	bool _modoEdicion = false;
 	bool _modoEliminar = false;
 	final Set<String> _idsSeleccionados = <String>{};
+	int _paginaActual = 0;
 
 	_PanolStockFilterSort _filtroOrden = _PanolStockFilterSort.catalogo;
 	String _busqueda = "";
@@ -55,6 +60,16 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 	String _visiblesCacheBusqueda = "";
 	_PanolStockFilterSort _visiblesCacheOrden = _PanolStockFilterSort.catalogo;
 	String? _visiblesCacheCategoria;
+
+	final ScrollController _desktopTableHScroll = ScrollController();
+	final ScrollController _desktopTableVScroll = ScrollController();
+
+	@override
+	void dispose() {
+		_desktopTableHScroll.dispose();
+		_desktopTableVScroll.dispose();
+		super.dispose();
+	}
 
 	void _setModoEdicion(bool activo) {
 		setState(() {
@@ -255,7 +270,15 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 			_busqueda = result.q;
 			_filtroOrden = result.orden;
 			_categoriaFiltro = result.categoria;
+			_paginaActual = 0;
 		});
+	}
+
+	void _irAPaginaStock(int pagina) {
+		setState(() => _paginaActual = pagina);
+		if (_desktopTableVScroll.hasClients) {
+			_desktopTableVScroll.jumpTo(0);
+		}
 	}
 
 	void _back(BuildContext context) {
@@ -436,68 +459,75 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 		);
 		final catalogAsync = ref.watch(supervisorStockCatalogProvider);
 		final compact = _panolStockLayoutCompact(context);
+		final productos = catalogAsync.asData?.value;
 
-		return catalogAsync.when(
-			loading: () => Scaffold(
-				backgroundColor: AppTokens.surfacePage,
-				body: Column(
-					crossAxisAlignment: CrossAxisAlignment.stretch,
-					children: [
-						StockScreenHeader(
-							title: "STOCK",
-							onBack: () => _back(context),
-							onRefresh: () => ScreenRefresh.stock(ref),
-						),
-						const Expanded(
-							child: Center(child: CircularProgressIndicator()),
-						),
-					],
+		if (productos == null) {
+			return catalogAsync.when(
+				loading: () => Scaffold(
+					backgroundColor: AppTokens.surfacePage,
+					body: Column(
+						crossAxisAlignment: CrossAxisAlignment.stretch,
+						children: [
+							StockScreenHeader(
+								title: "STOCK",
+								onBack: () => _back(context),
+								onRefresh: () => ScreenRefresh.stock(ref),
+							),
+							const Expanded(
+								child: Center(child: CircularProgressIndicator()),
+							),
+						],
+					),
 				),
-			),
-			error: (e, _) => Scaffold(
-				backgroundColor: AppTokens.surfacePage,
-				body: Column(
-					crossAxisAlignment: CrossAxisAlignment.stretch,
-					children: [
-						StockScreenHeader(
-							title: "STOCK",
-							onBack: () => _back(context),
-							onRefresh: () => ScreenRefresh.stock(ref),
-						),
-						Expanded(
-							child: Center(
-								child: Padding(
-									padding: const EdgeInsets.all(24),
-									child: Column(
-										mainAxisSize: MainAxisSize.min,
-										children: [
-											const Text(
-												"No se pudo cargar el stock.",
-												textAlign: TextAlign.center,
-											),
-											const SizedBox(height: 8),
-											Text(
-												"$e",
-												textAlign: TextAlign.center,
-												style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
-											),
-											const SizedBox(height: 16),
-											FilledButton(
-												onPressed: () =>
-														ref.invalidate(supervisorStockCatalogProvider),
-												child: const Text("Reintentar"),
-											),
-										],
+				error: (e, _) => Scaffold(
+					backgroundColor: AppTokens.surfacePage,
+					body: Column(
+						crossAxisAlignment: CrossAxisAlignment.stretch,
+						children: [
+							StockScreenHeader(
+								title: "STOCK",
+								onBack: () => _back(context),
+								onRefresh: () => ScreenRefresh.stock(ref),
+							),
+							Expanded(
+								child: Center(
+									child: Padding(
+										padding: const EdgeInsets.all(24),
+										child: Column(
+											mainAxisSize: MainAxisSize.min,
+											children: [
+												const Text(
+													"No se pudo cargar el stock.",
+													textAlign: TextAlign.center,
+												),
+												const SizedBox(height: 8),
+												Text(
+													"$e",
+													textAlign: TextAlign.center,
+													style: TextStyle(
+														fontSize: 12,
+														color: Colors.grey.shade700,
+													),
+												),
+												const SizedBox(height: 16),
+												FilledButton(
+													onPressed: () => ScreenRefresh.stock(ref),
+													child: const Text("Reintentar"),
+												),
+											],
+										),
 									),
 								),
 							),
-						),
-					],
+						],
+					),
 				),
-			),
-			data: (productos) {
-				final visibles = _productosVisibles(productos);
-				return Scaffold(
+				data: (_) => const SizedBox.shrink(),
+			);
+		}
+
+		final visibles = _productosVisibles(productos);
+		return Scaffold(
 			backgroundColor: AppTokens.surfacePage,
 			body: Column(
 				crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -554,9 +584,8 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 				],
 			),
 		);
-			},
-		);
 	}
+
 	Widget _buildStockPanel({
 		required bool compact,
 		required List<StockProduct> visibles,
@@ -564,6 +593,17 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 		required bool puedeGestionar,
 	}) {
 		final toolbarPad = compact ? 10.0 : 16.0;
+		final usaPaginacion = !compact;
+		final totalPaginas = !usaPaginacion || visibles.isEmpty
+				? 1
+				: (visibles.length / _itemsPorPagina).ceil().clamp(1, 999);
+		final paginaSegura = !usaPaginacion || totalPaginas <= 1
+				? 0
+				: _paginaActual.clamp(0, totalPaginas - 1);
+		final inicio = paginaSegura * _itemsPorPagina;
+		final itemsLista = usaPaginacion
+				? visibles.skip(inicio).take(_itemsPorPagina).toList()
+				: visibles;
 
 		return Material(
 			color: AppTokens.whiteSurface,
@@ -828,10 +868,64 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 					else
 						Expanded(
 							child: compact
-									? _buildMobileStockList(visibles, puedeGestionar)
-									: _buildDesktopStockTable(visibles, puedeGestionar),
+									? _buildMobileStockList(itemsLista, puedeGestionar)
+									: _buildDesktopStockTable(itemsLista, puedeGestionar),
 						),
+					if (usaPaginacion && visibles.isNotEmpty && totalPaginas > 1)
+						ComprasPaginationBar(
+							currentPage: paginaSegura,
+							totalPages: totalPaginas,
+							onPage: _irAPaginaStock,
+						),
+					_buildStockTotalFooter(
+						totalProductos: productos.length,
+						visibles: visibles.length,
+						hayFiltros: _hayFiltrosActivos,
+						pagina: paginaSegura,
+						totalPaginas: usaPaginacion ? totalPaginas : 1,
+						desde: visibles.isEmpty ? 0 : inicio + 1,
+						hasta: visibles.isEmpty
+								? 0
+								: usaPaginacion
+									? (inicio + itemsLista.length).clamp(0, visibles.length)
+									: visibles.length,
+					),
 				],
+			),
+		);
+	}
+
+	Widget _buildStockTotalFooter({
+		required int totalProductos,
+		required int visibles,
+		required bool hayFiltros,
+		required int pagina,
+		required int totalPaginas,
+		required int desde,
+		required int hasta,
+	}) {
+		final base = hayFiltros && visibles != totalProductos
+				? "$visibles de $totalProductos productos en catálogo"
+				: "$totalProductos productos en catálogo";
+		final texto = totalPaginas > 1
+				? "$base · $desde–$hasta (pág. ${pagina + 1}/$totalPaginas)"
+				: "Total: $base";
+		return Container(
+			padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+			decoration: BoxDecoration(
+				color: AppTokens.surfaceMuted,
+				border: Border(top: BorderSide(color: Colors.grey.shade300)),
+			),
+			child: Align(
+				alignment: Alignment.centerRight,
+				child: Text(
+					texto,
+					style: const TextStyle(
+						fontWeight: FontWeight.w700,
+						fontSize: 13,
+						color: Colors.black87,
+					),
+				),
 			),
 		);
 	}
@@ -843,40 +937,96 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 		color: Colors.black87,
 	);
 
+	static const ScrollbarThemeData _kStockClassicScrollbarTheme = ScrollbarThemeData(
+		thumbVisibility: WidgetStatePropertyAll(true),
+		trackVisibility: WidgetStatePropertyAll(true),
+		thickness: WidgetStatePropertyAll(14),
+		radius: Radius.zero,
+		crossAxisMargin: 0,
+		mainAxisMargin: 2,
+		minThumbLength: 28,
+		thumbColor: WidgetStatePropertyAll(Color(0xFFC0C0C0)),
+		trackColor: WidgetStatePropertyAll(Color(0xFFE0E0E0)),
+		trackBorderColor: WidgetStatePropertyAll(Color(0xFF9A9A9A)),
+	);
+
+	Widget _stockScrollbar({
+		required ScrollController controller,
+		required Widget child,
+		ScrollNotificationPredicate? notificationPredicate,
+	}) {
+		return Scrollbar(
+			controller: controller,
+			thumbVisibility: true,
+			trackVisibility: true,
+			interactive: true,
+			thickness: 14,
+			radius: Radius.zero,
+			notificationPredicate:
+				notificationPredicate ?? defaultScrollNotificationPredicate,
+			child: child,
+		);
+	}
+
 	Widget _buildDesktopStockTable(List<StockProduct> visibles, bool puedeGestionar) {
 		final showCheck = puedeGestionar && _modoEliminar;
+		final showBar = AppScrollBehavior.showPersistentScrollbarThumb(context);
 		return LayoutBuilder(
 			builder: (context, constraints) {
 				final tableW = constraints.maxWidth > _kPanolStockTableWidth
 						? constraints.maxWidth
 						: _kPanolStockTableWidth;
-				return Scrollbar(
-					thumbVisibility: true,
-					notificationPredicate: (n) => n.metrics.axis == Axis.horizontal,
-					child: SingleChildScrollView(
-						scrollDirection: Axis.horizontal,
-						child: SizedBox(
-							width: tableW,
-							height: constraints.maxHeight,
-							child: Column(
-								crossAxisAlignment: CrossAxisAlignment.stretch,
-								children: [
-									_desktopTableHeader(showCheck),
-									Expanded(
-										child: Scrollbar(
-											child: ListView.builder(
-												itemCount: visibles.length,
-												itemBuilder: (context, i) => _desktopStockRow(
-													visibles[i],
-													puedeGestionar,
-													showCheck,
-												),
-											),
-										),
-									),
-								],
-							),
+				Widget list = ListView.builder(
+					controller: _desktopTableVScroll,
+					primary: false,
+					physics: const ClampingScrollPhysics(),
+					itemExtent: 72,
+					cacheExtent: 960,
+					addAutomaticKeepAlives: false,
+					itemCount: visibles.length,
+					itemBuilder: (context, i) => RepaintBoundary(
+						child: _desktopStockRow(
+							visibles[i],
+							puedeGestionar,
+							showCheck,
 						),
+					),
+				);
+				if (showBar) {
+					list = _stockScrollbar(
+						controller: _desktopTableVScroll,
+						child: list,
+					);
+				}
+				Widget table = SingleChildScrollView(
+					controller: _desktopTableHScroll,
+					scrollDirection: Axis.horizontal,
+					physics: const ClampingScrollPhysics(),
+					child: SizedBox(
+						width: tableW,
+						height: constraints.maxHeight,
+						child: Column(
+							crossAxisAlignment: CrossAxisAlignment.stretch,
+							children: [
+								_desktopTableHeader(showCheck),
+								Expanded(child: list),
+							],
+						),
+					),
+				);
+				if (showBar) {
+					table = _stockScrollbar(
+						controller: _desktopTableHScroll,
+						notificationPredicate: (notification) =>
+							notification.metrics.axis == Axis.horizontal,
+						child: table,
+					);
+				}
+				return ScrollbarTheme(
+					data: _kStockClassicScrollbarTheme,
+					child: ScrollConfiguration(
+						behavior: AppScrollBehavior.withoutAutoScrollbar(),
+						child: table,
 					),
 				);
 			},
@@ -1010,10 +1160,15 @@ class _PanolStockScreenState extends ConsumerState<PanolStockScreen> {
 	Widget _buildMobileStockList(List<StockProduct> productos, bool puedeGestionar) {
 		return ListView.builder(
 			padding: const EdgeInsets.fromLTRB(10, 12, 10, 16),
+			itemExtent: 168,
+			cacheExtent: 640,
+			addAutomaticKeepAlives: false,
 			itemCount: productos.length,
-			itemBuilder: (context, i) => Padding(
-				padding: const EdgeInsets.only(bottom: 10),
-				child: _mobileProductCard(productos[i], puedeGestionar),
+			itemBuilder: (context, i) => RepaintBoundary(
+				child: Padding(
+					padding: const EdgeInsets.only(bottom: 10),
+					child: _mobileProductCard(productos[i], puedeGestionar),
+				),
 			),
 		);
 	}

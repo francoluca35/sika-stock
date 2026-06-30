@@ -84,8 +84,10 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 
 			if (compressed.length > kMaxOrderPhotoBytes) {
 				ScaffoldMessenger.of(context).showSnackBar(
-					const SnackBar(
-						content: Text("No se pudo reducir la foto por debajo de 1,5 MB. Probá otra imagen."),
+					SnackBar(
+						content: Text(
+							"No se pudo reducir la foto por debajo de $kMaxOrderPhotoBytesLabel. Probá otra imagen.",
+						),
 					),
 				);
 				return;
@@ -176,6 +178,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 						productType: _tipoProducto!,
 						priority: _prioridad!.dbValue,
 						destination: _destinoCtrl.text.trim(),
+						photoJpeg: _photoJpeg,
 					);
 			ref.invalidate(maintenanceOrdersProvider);
 			ref.invalidate(misPedidosMantenimientoProvider);
@@ -360,7 +363,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 															),
 															const SizedBox(height: 4),
 															Text(
-																"Se comprime automáticamente a menos de 1,5 MB.",
+																"Se comprime automáticamente a menos de $kMaxOrderPhotoBytesLabel.",
 																style: TextStyle(
 																	fontSize: 12,
 																	color: Colors.grey.shade600,
@@ -419,7 +422,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 													),
 													const SizedBox(height: 6),
 													Text(
-														"Peso final: ${(_photoJpeg!.length / 1024).toStringAsFixed(1)} KB · máx. ${(kMaxOrderPhotoBytes / 1024).toStringAsFixed(0)} KB",
+														"Peso final: ${(_photoJpeg!.length / 1024).toStringAsFixed(1)} KB · máx. $kMaxOrderPhotoBytesLabel",
 														style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
 													),
 												],

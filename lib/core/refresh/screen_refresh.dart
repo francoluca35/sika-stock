@@ -6,6 +6,7 @@ import "../../features/orders/application/mantenimiento_notificaciones_provider.
 import "../../features/orders/application/mis_pedidos_mantenimiento_provider.dart";
 import "../../features/panol/application/panol_order_history_provider.dart";
 import "../../features/panol/application/panol_seguimiento_compras_provider.dart";
+import "../../features/stock/application/stock_categories_provider.dart";
 import "../../features/supervisor/application/supervisor_maintenance_history_provider.dart";
 import "provider_reload.dart";
 
@@ -27,7 +28,9 @@ abstract final class ScreenRefresh {
 	}
 
 	static void stock(WidgetRef ref) {
-		ProviderReload.stockAll(_c(ref));
+		final c = _c(ref);
+		ProviderReload.stockCatalogForce(c);
+		c.read(stockCategoriesProvider.notifier).refresh();
 	}
 
 	static void pedidosPanol(WidgetRef ref) {
@@ -70,9 +73,11 @@ abstract final class ScreenRefresh {
 	}
 
 	static void panolHome(WidgetRef ref) {
+		final c = _c(ref);
 		pedidosPanol(ref);
 		seguimiento(ref);
-		stock(ref);
+		ProviderReload.stockCatalog(c);
+		ProviderReload.stockCategories(c);
 	}
 
 	static void mantenimientoHome(WidgetRef ref) {

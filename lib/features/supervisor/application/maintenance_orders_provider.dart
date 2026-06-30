@@ -60,7 +60,7 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 			stockItemId: stockItemId,
 		);
 		if (hayStock && stockItemId != null && stockItemId.isNotEmpty) {
-			ref.invalidate(supervisorStockCatalogProvider);
+			ref.read(supervisorStockCatalogProvider.notifier).refresh();
 		}
 		_afterWorkflowChange();
 	}
@@ -125,7 +125,7 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 	}
 
 	void _afterRetiroInventoryChange() {
-		ref.invalidate(supervisorStockCatalogProvider);
+		ref.read(supervisorStockCatalogProvider.notifier).refresh();
 		_afterWorkflowChange();
 	}
 

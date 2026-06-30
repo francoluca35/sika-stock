@@ -2,12 +2,17 @@ import "dart:typed_data";
 
 import "package:image/image.dart" as img;
 
-/// Tope para adjuntos del pedido (~1,5 MB).
-const int kMaxOrderPhotoBytes = 1572864;
+/// Tope para adjuntos del pedido (~300 KB) — bajo egreso en Supabase Storage.
+const int kMaxOrderPhotoBytes = 307200;
 
-/// Comprime una imagen (JPEG/PNG/WebP según soporte del decoder) a JPEG con tamaño ≤ [kMaxOrderPhotoBytes].
-/// Pensado para fotos de cámara de alto megapixel.
-/// Si no se puede decodificar, devuelve `null` (no forzar bytes corruptos).
+/// Lado más largo tras comprimir (suficiente para ver el producto en pantalla).
+const int kMaxOrderPhotoLongestSide = 1024;
+
+/// Calidad JPEG inicial al comprimir fotos de pedido.
+const int kOrderPhotoJpegQualityStart = 78;
+
+/// Comprime una imagen a JPEG liviano (≤ [kMaxOrderPhotoBytes], lado ≤ [kMaxOrderPhotoLongestSide]).
+/// Si no se puede decodificar, devuelve `null`.
 Uint8List? compressOrderPhotoBytes(Uint8List raw) {
 	final decoded = img.decodeImage(raw);
 	if (decoded == null) {
@@ -35,48 +40,48 @@ Uint8List? compressOrderPhotoBytes(Uint8List raw) {
 		}
 	}
 
-	resizeToMaxSide(2048);
+	resizeToMaxSide(kMaxOrderPhotoLongestSide);
 
-	var quality = 88;
+	var quality = kOrderPhotoJpegQualityStart;
 	Uint8List out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
 
-	while (out.length > kMaxOrderPhotoBytes && quality >= 38) {
-		quality -= 8;
+	while (out.length > kMaxOrderPhotoBytes && quality >= 42) {
+		quality -= 6;
 		out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
 	}
 
 	var iterations = 0;
-	while (out.length > kMaxOrderPhotoBytes && iterations < 14) {
+	while (out.length > kMaxOrderPhotoBytes && iterations < 10) {
 		iterations++;
-		final side = (longestSide(image) * 0.82).round().clamp(360, 8192);
+		final side = (longestSide(image) * 0.85).round().clamp(480, kMaxOrderPhotoLongestSide);
 		resizeToMaxSide(side);
-		quality = 84;
-		out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
-		while (out.length > kMaxOrderPhotoBytes && quality >= 26) {
-			quality -= 6;
-			out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
-		}
-	}
-
-	if (out.length > kMaxOrderPhotoBytes) {
-		image = img.copyResize(image, width: 720, interpolation: img.Interpolation.linear);
 		quality = 72;
 		out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
-		while (out.length > kMaxOrderPhotoBytes && quality >= 22) {
+		while (out.length > kMaxOrderPhotoBytes && quality >= 36) {
 			quality -= 5;
 			out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
 		}
 	}
 
 	if (out.length > kMaxOrderPhotoBytes) {
-		image = img.copyResize(image, width: 480, interpolation: img.Interpolation.linear);
-		quality = 62;
+		image = img.copyResize(image, width: 720, interpolation: img.Interpolation.linear);
+		quality = 68;
 		out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
-		while (out.length > kMaxOrderPhotoBytes && quality >= 18) {
+		while (out.length > kMaxOrderPhotoBytes && quality >= 32) {
 			quality -= 4;
 			out = Uint8List.fromList(img.encodeJpg(image, quality: quality));
 		}
 	}
 
+	if (out.length > kMaxOrderPhotoBytes) {
+		return null;
+	}
+
 	return out;
+}
+
+/// Texto legible del tope de peso (p. ej. "300 KB").
+String get kMaxOrderPhotoBytesLabel {
+	final kb = (kMaxOrderPhotoBytes / 1024).round();
+	return "$kb KB";
 }

@@ -9,6 +9,7 @@ import "core/notifications/local_notification_service.dart";
 import "core/realtime/app_realtime_shell.dart";
 import "core/router/app_router.dart";
 import "core/supabase/supabase_bootstrap.dart";
+import "core/theme/app_scroll_behavior.dart";
 import "core/theme/app_theme.dart";
 
 Future<void> main() async {
@@ -38,8 +39,11 @@ class SikaStockApp extends ConsumerWidget {
 			debugShowCheckedModeBanner: false,
 			theme: AppTheme.light(),
 			routerConfig: router,
-			builder: (context, child) => AppRealtimeShell(
-				child: child ?? const SizedBox.shrink(),
+			builder: (context, child) => ScrollConfiguration(
+				behavior: AppScrollBehavior.material(),
+				child: AppRealtimeShell(
+					child: child ?? const SizedBox.shrink(),
+				),
 			),
 		);
 	}
