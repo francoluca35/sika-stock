@@ -5,6 +5,7 @@ import "package:go_router/go_router.dart";
 import "../../../core/format/argentina_datetime.dart";
 import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
+import "../../orders/presentation/widgets/maintenance_order_photo_dialog.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../panol/application/panol_forwarded_orders_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
@@ -358,6 +359,7 @@ class _SupervisorMaintenanceOrdersScreenState
 
   Future<void> _mostrarDetalle(BuildContext context, MaintenanceOrder o) async {
     late final List<StockProduct> catalog;
+    final repo = ref.read(maintenanceOrdersRepositoryProvider);
     try {
       catalog = await ref.read(supervisorStockCatalogProvider.future);
     } catch (e) {
@@ -367,7 +369,20 @@ class _SupervisorMaintenanceOrdersScreenState
       );
       return;
     }
-    final analisis = _analisisParaOrden(o, catalog);
+
+    MaintenanceOrder order = o;
+    try {
+      final fresh = await repo.fetchOrderById(o.id);
+      if (fresh != null) {
+        order = fresh;
+      }
+    } catch (_) {
+      /* usar fila en memoria */
+    }
+
+    final photoUrl = await repo.resolveOrderPhotoUrl(order);
+
+    final analisis = _analisisParaOrden(order, catalog);
     if (!context.mounted) return;
     showModalBottomSheet<void>(
       context: context,
@@ -380,7 +395,7 @@ class _SupervisorMaintenanceOrdersScreenState
       builder: (ctx) {
         final bottom = MediaQuery.paddingOf(ctx).bottom;
         final (ebg, efg) =
-            SupervisorMaintenanceOrdersScreen._workflowBadgeColors(o);
+            SupervisorMaintenanceOrdersScreen._workflowBadgeColors(order);
         return Padding(
           padding: EdgeInsets.only(
             left: 20,
@@ -500,61 +515,35 @@ class _SupervisorMaintenanceOrdersScreenState
                     ],
                   ),
                 ),
-                if (o.imagenUrl != null && o.imagenUrl!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    "Imagen adjunta",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(AppTokens.radiusMd),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 10,
-                      child: Image.network(
-                        o.imagenUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey.shade200,
-                          alignment: Alignment.center,
-                          child: Icon(
-                            Icons.broken_image_outlined,
-                            size: 48,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Container(
-                            color: Colors.grey.shade100,
-                            alignment: Alignment.center,
-                            child: const SizedBox(
-                              width: 28,
-                              height: 28,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          );
-                        },
-                      ),
+                if (photoUrl != null && photoUrl.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      showMaintenanceOrderPhotoDialog(
+                        context,
+                        photoUrl,
+                        title: "Foto del pedido · ${order.numeroOrden}",
+                      );
+                    },
+                    icon: const Icon(Icons.image_outlined, size: 20),
+                    label: const Text(
+                      "VER IMAGEN",
+                      style: TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
                 ],
-                if (_puedeElegirLineaStock(o)) ...[
+                if (_puedeElegirLineaStock(order)) ...[
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: () {
                       Navigator.of(ctx).pop();
-                      _elegirProductoCatalogo(context, o, catalog);
+                      _elegirProductoCatalogo(context, order, catalog);
                     },
                     icon: const Icon(Icons.inventory_2_outlined, size: 20),
                     label: const Text("Elegir otra línea del catálogo"),
                   ),
                 ],
-                if (o.workflowStatus ==
+                if (order.workflowStatus ==
                     MaintenanceWorkflowStatus.pendingSupervisor) ...[
                   const SizedBox(height: 16),
                   DecoratedBox(
@@ -591,8 +580,8 @@ class _SupervisorMaintenanceOrdersScreenState
                           if (analisis.match != null)
                             Text(
                               analisis.haySuficiente
-                                  ? "Línea: ${analisis.match!.nombre} · Disponible: ${analisis.disponible} · Se piden: ${o.quantity} u."
-                                  : "Línea: ${analisis.match!.nombre} · Disponible: ${analisis.disponible} (se piden ${o.quantity} u.). Derivá a pañol.",
+                                  ? "Línea: ${analisis.match!.nombre} · Disponible: ${analisis.disponible} · Se piden: ${order.quantity} u."
+                                  : "Línea: ${analisis.match!.nombre} · Disponible: ${analisis.disponible} (se piden ${order.quantity} u.). Derivá a pañol.",
                               style: TextStyle(
                                 fontSize: 13,
                                 height: 1.3,
@@ -626,13 +615,13 @@ class _SupervisorMaintenanceOrdersScreenState
                                         analisis.match != null) {
                                       await _confirmarRetiroOk(
                                         context,
-                                        o,
+                                        order,
                                         catalog,
                                       );
                                     } else {
                                       await _decidirStock(
                                         context,
-                                        o,
+                                        order,
                                         hayStock: false,
                                       );
                                     }
@@ -906,10 +895,9 @@ class _SupervisorMaintenanceOrdersScreenState
                                   SupervisorMaintenanceOrdersScreen
                                       ._tableLayoutMinWidth;
                           if (useTable) {
-                            return Scrollbar(
-                              child: SingleChildScrollView(
-                                padding: const EdgeInsets.all(12),
-                                child: Table(
+                            return SingleChildScrollView(
+                              padding: const EdgeInsets.all(12),
+                              child: Table(
                                   defaultVerticalAlignment:
                                       TableCellVerticalAlignment.middle,
                                   columnWidths: const {
@@ -1014,7 +1002,6 @@ class _SupervisorMaintenanceOrdersScreenState
                                       }(),
                                   ],
                                 ),
-                              ),
                             );
                           }
                           return ListView.separated(

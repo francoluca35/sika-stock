@@ -47,13 +47,14 @@ abstract final class ProviderReload {
 		container.read(supervisorStockCatalogProvider.notifier).refresh();
 	}
 
-	static void stockCategories(ProviderContainer container) {
-		container.read(stockCategoriesProvider.notifier).refresh();
+	static void stockCatalogForce(ProviderContainer container) {
+		container
+				.read(supervisorStockCatalogProvider.notifier)
+				.refresh(showLoading: true);
 	}
 
-	static void stockAll(ProviderContainer container) {
-		stockCatalog(container);
-		stockCategories(container);
+	static void stockCategories(ProviderContainer container) {
+		container.read(stockCategoriesProvider.notifier).refresh();
 	}
 
 	/// Cambios en `maintenance_orders` o `compras_panol_stock_requests`.
@@ -72,6 +73,7 @@ abstract final class ProviderReload {
 	}
 
 	static void onStockTablesChange(ProviderContainer container) {
-		stockAll(container);
+		stockCatalog(container);
+		stockCategories(container);
 	}
 }

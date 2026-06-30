@@ -72,6 +72,26 @@ class AdminUsersRepository {
 		}
 	}
 
+	Future<void> deleteUser({required String userId}) async {
+		try {
+			await _client.rpc(
+				"admin_delete_user",
+				params: <String, dynamic>{"p_user_id": userId},
+			);
+		} on PostgrestException catch (e) {
+			final msg = e.message.trim();
+			if (msg.contains("admin_delete_user") &&
+				(msg.contains("does not exist") || msg.contains("Could not find"))) {
+				throw Exception(
+					"Falta instalar la función en Supabase. "
+					"Ejecutá el SQL de supabase/migrations/20260623100000_admin_delete_user_rpc.sql "
+					"en el SQL Editor del panel.",
+				);
+			}
+			throw Exception(msg.isEmpty ? "Error al eliminar usuario" : msg);
+		}
+	}
+
 	/// Listado para ADMIN/SUPERADMIN (requiere política `profiles_select_scope` en Supabase).
 	Future<List<ProfileRow>> fetchAllProfiles() async {
 		final rows = await _client

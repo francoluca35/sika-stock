@@ -76,21 +76,6 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 												subtitle: "Ver el estado de tus pedidos y retiros",
 												onTap: () => context.push("/pedidos/mis-pedidos"),
 											),
-											const SizedBox(height: 16),
-											_MaintenanceMenuCard(
-												leadingDecoration: const BoxDecoration(
-													color: AppTokens.redAction,
-													borderRadius: BorderRadius.all(Radius.circular(12)),
-												),
-												leading: const Icon(
-													Icons.description_outlined,
-													color: Colors.white,
-													size: 28,
-												),
-												title: "ÓRDENES DE TRABAJO",
-												subtitle: "Completar OT asignadas, firmar y enviar",
-												onTap: () => context.push("/mantenimiento/ordenes-trabajo"),
-											),
 										],
 									),
 								),
