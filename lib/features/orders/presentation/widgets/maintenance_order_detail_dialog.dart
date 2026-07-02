@@ -38,6 +38,8 @@ void showMaintenanceOrderDetalleDialog(
 						_DetalleFila(label: "Tipo", valor: order.productType),
 						_DetalleFila(label: "Prioridad", valor: order.priority),
 						_DetalleFila(label: "Destino", valor: order.destination),
+						if (order.observacion.trim().isNotEmpty)
+							_DetalleFila(label: "Observación", valor: order.observacion),
 						_DetalleFila(label: "Solicitante", valor: order.solicitante),
 						_DetalleFila(label: "Estado", valor: _workflowLabel(order.workflowStatus)),
 						if (stockCatalogoCantidad != null)

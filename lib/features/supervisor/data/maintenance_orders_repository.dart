@@ -20,6 +20,7 @@ class MaintenanceOrdersRepository {
 		required String productType,
 		required String priority,
 		required String destination,
+		String? observacion,
 		Uint8List? photoJpeg,
 	}) async {
 		await createOrderReturningId(
@@ -29,6 +30,7 @@ class MaintenanceOrdersRepository {
 			productType: productType,
 			priority: priority,
 			destination: destination,
+			observacion: observacion,
 			photoJpeg: photoJpeg,
 		);
 	}
@@ -41,6 +43,7 @@ class MaintenanceOrdersRepository {
 		required String productType,
 		required String priority,
 		required String destination,
+		String? observacion,
 		Uint8List? photoJpeg,
 	}) async {
 		final uid = _client.auth.currentUser?.id;
@@ -68,6 +71,10 @@ class MaintenanceOrdersRepository {
 			"priority": priority,
 			"destination": destination,
 		};
+		final obs = observacion?.trim();
+		if (obs != null && obs.isNotEmpty) {
+			payload["observacion"] = obs;
+		}
 		if (imagenUrl != null) {
 			payload["imagen_url"] = imagenUrl;
 		}

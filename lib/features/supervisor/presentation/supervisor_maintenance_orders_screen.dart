@@ -503,6 +503,11 @@ class _SupervisorMaintenanceOrdersScreenState
                   label: "Destino",
                   value: o.destination,
                 ),
+                if (o.observacion.trim().isNotEmpty)
+                  _DetailRow(
+                    label: "Observación",
+                    value: o.observacion,
+                  ),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Row(

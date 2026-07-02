@@ -81,6 +81,7 @@ class MaintenanceOrder {
 		required this.productType,
 		required this.priority,
 		required this.destination,
+		this.observacion = "",
 		this.imagenUrl,
 		this.updatedAt,
 		this.createdBy,
@@ -103,6 +104,9 @@ class MaintenanceOrder {
 	final String productType;
 	final String priority;
 	final String destination;
+
+	/// Comentario libre del solicitante (qué necesita / para qué).
+	final String observacion;
 
 	final String? imagenUrl;
 
@@ -164,6 +168,7 @@ class MaintenanceOrder {
 			productType: m["product_type"] as String,
 			priority: m["priority"] as String,
 			destination: m["destination"] as String,
+			observacion: (m["observacion"] as String?)?.trim() ?? "",
 			imagenUrl: m["imagen_url"] as String?,
 			updatedAt: updatedAt,
 			createdBy: m["created_by"]?.toString(),
@@ -197,6 +202,7 @@ class MaintenanceOrder {
 			productType: productType,
 			priority: priority,
 			destination: destination,
+			observacion: observacion,
 			imagenUrl: imagenUrl,
 			updatedAt: updatedAt ?? this.updatedAt,
 			createdBy: createdBy ?? this.createdBy,

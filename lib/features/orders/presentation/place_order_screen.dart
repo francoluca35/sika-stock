@@ -30,6 +30,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
   final _nombreCtrl = TextEditingController();
   final _cantidadCtrl = TextEditingController();
   final _destinoCtrl = TextEditingController();
+  final _observacionCtrl = TextEditingController();
 
 	String? _tipoProducto;
 	OrderPriority? _prioridad;
@@ -52,6 +53,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
     _nombreCtrl.dispose();
     _cantidadCtrl.dispose();
     _destinoCtrl.dispose();
+    _observacionCtrl.dispose();
     super.dispose();
   }
 
@@ -178,6 +180,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 						productType: _tipoProducto!,
 						priority: _prioridad!.dbValue,
 						destination: _destinoCtrl.text.trim(),
+						observacion: _observacionCtrl.text.trim(),
 						photoJpeg: _photoJpeg,
 					);
 			ref.invalidate(maintenanceOrdersProvider);
@@ -193,6 +196,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 			_nombreCtrl.clear();
 			_cantidadCtrl.clear();
 			_destinoCtrl.clear();
+			_observacionCtrl.clear();
 			setState(() {
 				_tipoProducto = null;
 				_prioridad = null;
@@ -350,6 +354,33 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 														}
 														return null;
 													},
+												),
+												const SizedBox(height: 18),
+												Align(
+													alignment: Alignment.centerLeft,
+													child: Text(
+														"OBSERVACIÓN",
+														style: AuthFieldStyles.labelAbove,
+													),
+												),
+												const SizedBox(height: 4),
+												Text(
+													"Opcional: explicá para qué lo necesitás, medidas, marca, urgencia, etc.",
+													style: TextStyle(
+														fontSize: 12,
+														color: Colors.grey.shade600,
+													),
+												),
+												const SizedBox(height: 8),
+												TextFormField(
+													controller: _observacionCtrl,
+													maxLines: 4,
+													minLines: 3,
+													textCapitalization: TextCapitalization.sentences,
+													decoration: AuthFieldStyles.outline(
+														hintText: "Ej.: repuesto para bomba línea 3, rosca 1/2\"…",
+														prefixIcon: Icons.notes_outlined,
+													),
 												),
 												const SizedBox(height: 18),
 												Align(
