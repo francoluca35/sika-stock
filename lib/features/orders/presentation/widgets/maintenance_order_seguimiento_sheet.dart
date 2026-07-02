@@ -148,22 +148,18 @@ List<String> _seguimientoLineas(MaintenanceOrder o) {
 			break;
 		case MaintenanceWorkflowStatus.panolRequestedCompras:
 			out.add(
-				"Pañol solicitó material a compras (sin stock en planta).",
+				"Pañol registró pedido a compras (sin stock en planta).",
 			);
 			break;
 		case MaintenanceWorkflowStatus.comprasOcNotified:
-			out.add(
-				"Compras notificó orden de compra / pre-aprobación emitida.",
-			);
-			break;
 		case MaintenanceWorkflowStatus.comprasPurchaseDone:
 			out.add(
-				"Compras confirmó que la compra fue realizada.",
+				"Pedido a compras en gestión por pañol.",
 			);
 			break;
 		case MaintenanceWorkflowStatus.comprasArrivedNotified:
 			out.add(
-				"Material recibido en planta: coordinar retiro con el sector solicitante.",
+				"Pañol avisó que el material está listo para retirar.",
 			);
 			break;
 		case MaintenanceWorkflowStatus.completed:

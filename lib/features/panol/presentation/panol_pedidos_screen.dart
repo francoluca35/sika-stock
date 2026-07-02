@@ -408,7 +408,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			ScaffoldMessenger.of(context).showSnackBar(
 																				SnackBar(
 																					content: Text(
-																						"Enviado a compras: ${mo.numeroOrden} · ${mo.producto}",
+																						"Pedido registrado para compra: ${mo.numeroOrden} · ${mo.producto}",
 																					),
 																				),
 																			);
@@ -1315,7 +1315,7 @@ class _PedidoBadge extends StatelessWidget {
 			case _EstadoPedidoPanol.enTramiteCompras:
 				return _chip("EN COMPRAS", Colors.amber.shade800, Colors.black87);
 			case _EstadoPedidoPanol.materialEnPlanta:
-				return _chip("EN PLANTA", AppTokens.statusOk, Colors.white);
+				return _chip("LISTO RETIRO", AppTokens.statusOk, Colors.white);
 			case _EstadoPedidoPanol.listoParaRetiro:
 				return _chip("LISTO RETIRO", AppTokens.statusOk, Colors.white);
 			case _EstadoPedidoPanol.completado:

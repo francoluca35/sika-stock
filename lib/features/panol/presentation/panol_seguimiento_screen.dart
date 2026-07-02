@@ -47,8 +47,8 @@ class PanolSeguimientoScreen extends ConsumerWidget {
 								Expanded(
 									child: Text(
 										"Productos pedidos a compras desde pañol. "
-										"Rojo: sin OC · Amarillo: OC emitida (avisar llegada desde aquí o Compras) · Verde: en planta. "
-										"Tocá un ítem para ver el trayecto.",
+										"Amarillo: pedido registrado · Verde: listo para retirar. "
+										"Tocá un ítem para ver el trayecto o avisar cuando esté listo.",
 										style: TextStyle(
 											fontSize: 13,
 											color: Colors.grey.shade800,

@@ -13,10 +13,6 @@ import "../application/compras_in_app_notifications_provider.dart";
 import "../application/compras_panol_stock_requests_provider.dart";
 import "../application/compras_stock_repository_provider.dart";
 import "../domain/compras_panol_stock_request_row.dart";
-import "../../orders/application/mantenimiento_notificaciones_provider.dart";
-import "../../orders/application/mis_pedidos_mantenimiento_provider.dart";
-import "../../panol/application/panol_forwarded_orders_provider.dart";
-import "../../supervisor/application/supervisor_maintenance_history_provider.dart";
 
 enum _PrioridadPedido { alta, media, baja }
 
@@ -31,12 +27,11 @@ _PrioridadPedido _prioridadPedidoDesdeString(String raw) {
 	return _PrioridadPedido.media;
 }
 
-/// Progreso del aviso por pedido: OC → compra realizada → llegada a planta.
-enum _EstadoAvisoPedido {
-	pendiente,
-	ocEmitida,
-	compraRealizada,
-	enPlanta,
+/// Estado del seguimiento (gestionado por pañol).
+enum _EstadoSeguimientoPanol {
+	pedidoCompras,
+	listoRetiro,
+	completado,
 }
 
 /// Solicitud externa mostrada en historial (la OC la emite otro sistema).
@@ -109,25 +104,23 @@ class _ComprasHistorialPedidosScreenState
 	int _paginaActual = 0;
 	static const int _itemsPorPagina = 10;
 
-	final Map<String, _EstadoAvisoPedido> _estadoAvisoPorOrden = {};
-
-	_EstadoAvisoPedido _estadoAviso(_SolicitudCompraRow row) {
+	_EstadoSeguimientoPanol _estadoSeguimiento(_SolicitudCompraRow row) {
 		final ws = row.workflowStatusDb;
 		if (ws != null) {
 			switch (ws) {
 				case "panol_requested_compras":
-					return _EstadoAvisoPedido.pendiente;
 				case "compras_oc_notified":
-					return _EstadoAvisoPedido.ocEmitida;
 				case "compras_purchase_done":
-					return _EstadoAvisoPedido.compraRealizada;
+					return _EstadoSeguimientoPanol.pedidoCompras;
 				case "compras_arrived_notified":
-					return _EstadoAvisoPedido.enPlanta;
+					return _EstadoSeguimientoPanol.listoRetiro;
+				case "completed":
+					return _EstadoSeguimientoPanol.completado;
 				default:
 					break;
 			}
 		}
-		return _estadoAvisoPorOrden[row.numeroOrden] ?? _EstadoAvisoPedido.pendiente;
+		return _EstadoSeguimientoPanol.pedidoCompras;
 	}
 
 	@override
@@ -210,119 +203,14 @@ class _ComprasHistorialPedidosScreenState
 		);
 	}
 
-	void _mostrarSnackOrdenEmitida(_SolicitudCompraRow row) {
-		if (!mounted) return;
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(
-				content: Text(
-					"Notificación enviada: se emitió orden de compra ${row.numeroOrden} · ${row.producto}.",
-				),
-				action: SnackBarAction(
-					label: "OK",
-					textColor: AppTokens.yellowAccent,
-					onPressed: () {},
-				),
-			),
-		);
-	}
-
-	void _mostrarSnackCompraRealizada(_SolicitudCompraRow row) {
-		if (!mounted) return;
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(
-				content: Text(
-					"Compra realizada registrada: ${row.numeroOrden} · ${row.producto}.",
-				),
-				action: SnackBarAction(
-					label: "OK",
-					textColor: AppTokens.yellowAccent,
-					onPressed: () {},
-				),
-			),
-		);
-	}
-
-	void _mostrarSnackLlegadaPlanta(_SolicitudCompraRow row) {
-		if (!mounted) return;
-		ScaffoldMessenger.of(context).showSnackBar(
-			SnackBar(
-				content: Text(
-					"Aviso: el pedido ${row.numeroOrden} (${row.producto}) ya llegó a planta.",
-				),
-				action: SnackBarAction(
-					label: "OK",
-					textColor: AppTokens.yellowAccent,
-					onPressed: () {},
-				),
-			),
-		);
-	}
-
-	Future<void> _onPasoAviso(_SolicitudCompraRow row) async {
-		final oid = row.maintenanceOrderId;
-		final ws = row.workflowStatusDb;
-		if (oid != null && ws != null) {
-			try {
-				final repo = ref.read(comprasStockRepositoryProvider);
-				if (ws == "panol_requested_compras") {
-					await repo.comprasNotifyOcEmitted(oid);
-					if (mounted) _mostrarSnackOrdenEmitida(row);
-				} else if (ws == "compras_oc_notified") {
-					await repo.comprasNotifyPurchaseDone(oid);
-					if (mounted) _mostrarSnackCompraRealizada(row);
-				} else if (ws == "compras_purchase_done") {
-					await repo.comprasNotifyMaterialArrived(oid);
-					if (mounted) _mostrarSnackLlegadaPlanta(row);
-				}
-				ref.invalidate(comprasPanolStockRequestsProvider);
-				ref.invalidate(comprasInAppNotificationsProvider);
-				ref.invalidate(mantenimientoNotificacionesProvider);
-				ref.invalidate(panolForwardedOrdersProvider);
-				ref.invalidate(supervisorMaintenanceHistoryProvider);
-				ref.invalidate(misPedidosMantenimientoProvider);
-				if (mounted) setState(() {});
-			} catch (e) {
-				if (!mounted) return;
-				ScaffoldMessenger.of(context).showSnackBar(
-					SnackBar(content: Text("No se pudo registrar el aviso: $e")),
-				);
-			}
-			return;
-		}
-		final key = row.numeroOrden;
-		final actual = _estadoAviso(row);
-		if (actual == _EstadoAvisoPedido.pendiente) {
-			setState(() {
-				_estadoAvisoPorOrden[key] = _EstadoAvisoPedido.ocEmitida;
-			});
-			_mostrarSnackOrdenEmitida(row);
-			return;
-		}
-		if (actual == _EstadoAvisoPedido.ocEmitida) {
-			setState(() {
-				_estadoAvisoPorOrden[key] = _EstadoAvisoPedido.compraRealizada;
-			});
-			_mostrarSnackCompraRealizada(row);
-			return;
-		}
-		if (actual == _EstadoAvisoPedido.compraRealizada) {
-			setState(() {
-				_estadoAvisoPorOrden[key] = _EstadoAvisoPedido.enPlanta;
-			});
-			_mostrarSnackLlegadaPlanta(row);
-		}
-	}
-
-	String _estadoAvisoDetalleText(_SolicitudCompraRow row) {
-		switch (_estadoAviso(row)) {
-			case _EstadoAvisoPedido.pendiente:
-				return "Pendiente: emitir aviso de OC / pre-aprobación.";
-			case _EstadoAvisoPedido.ocEmitida:
-				return "OC emitida. Pendiente registrar compra realizada.";
-			case _EstadoAvisoPedido.compraRealizada:
-				return "Compra realizada. Pendiente aviso de llegada a planta (Compras o Pañol).";
-			case _EstadoAvisoPedido.enPlanta:
-				return "Material registrado en planta.";
+	String _estadoSeguimientoTexto(_SolicitudCompraRow row) {
+		switch (_estadoSeguimiento(row)) {
+			case _EstadoSeguimientoPanol.pedidoCompras:
+				return "Pedido a compras (pañol gestiona el seguimiento).";
+			case _EstadoSeguimientoPanol.listoRetiro:
+				return "Listo para retirar (pañol avisó al sector).";
+			case _EstadoSeguimientoPanol.completado:
+				return "Retiro completado.";
 		}
 	}
 
@@ -426,11 +314,11 @@ class _ComprasHistorialPedidosScreenState
 								if (row.observaciones != null &&
 										row.observaciones!.trim().isNotEmpty)
 									_dialogCampo("Observaciones", row.observaciones!.trim()),
-								_dialogCampo("Estado de avisos (esta app)", _estadoAvisoDetalleText(row)),
+								_dialogCampo("Estado", _estadoSeguimientoTexto(row)),
 								const Divider(height: 20),
 								Text(
-									"Solicitud registrada por otro sector. La orden de compra "
-									"se gestiona en el sistema externo; desde acá solo se envían avisos.",
+									"Solicitud registrada por pañol. El seguimiento y los avisos "
+									"los gestiona pañol desde Seguimiento.",
 									style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
 								),
 								if (bloqueImagen != null) bloqueImagen,
@@ -529,8 +417,8 @@ class _ComprasHistorialPedidosScreenState
 													const SizedBox(height: 8),
 													_rowFechaMovil(
 														Icons.notifications_active_outlined,
-														"Estado avisos",
-														_estadoAvisoDetalleText(row),
+														"Estado",
+														_estadoSeguimientoTexto(row),
 													),
 													if (row.codigoInterno != null &&
 															row.codigoInterno!.trim().isNotEmpty) ...[
@@ -576,11 +464,6 @@ class _ComprasHistorialPedidosScreenState
 														vertical: 12,
 													),
 												),
-											),
-											_widgetBotonAviso(
-												row,
-												compact: false,
-												onAfter: () => setModal(() {}),
 											),
 										],
 									),
@@ -690,102 +573,6 @@ class _ComprasHistorialPedidosScreenState
 				),
 			),
 		);
-	}
-
-	ButtonStyle _styleAvisoTabla(Color bg, Color fg) => FilledButton.styleFrom(
-				backgroundColor: bg,
-				foregroundColor: fg,
-				elevation: 0,
-				padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-				minimumSize: const Size(118, 46),
-				tapTargetSize: MaterialTapTargetSize.padded,
-				textStyle: TextStyle(
-					fontWeight: FontWeight.w700,
-					fontSize: 13,
-					color: fg,
-				),
-			);
-
-	ButtonStyle _styleAvisoCard(Color bg, Color fg) => FilledButton.styleFrom(
-				backgroundColor: bg,
-				foregroundColor: fg,
-				elevation: 0,
-				padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-				minimumSize: const Size(120, 48),
-				textStyle: TextStyle(
-					fontWeight: FontWeight.w700,
-					fontSize: 14,
-					color: fg,
-				),
-			);
-
-	Widget _widgetBotonAviso(
-		_SolicitudCompraRow row, {
-		required bool compact,
-		VoidCallback? onAfter,
-	}) {
-		final estado = _estadoAviso(row);
-		switch (estado) {
-			case _EstadoAvisoPedido.pendiente:
-				return FilledButton.icon(
-					onPressed: () async {
-						await _onPasoAviso(row);
-						onAfter?.call();
-					},
-					icon: const Icon(Icons.campaign, size: 22, color: Colors.black87),
-					label: const Text("OC emitida"),
-					style: compact
-							? _styleAvisoTabla(AppTokens.yellowHeader, Colors.black87)
-							: _styleAvisoCard(AppTokens.yellowHeader, Colors.black87),
-				);
-			case _EstadoAvisoPedido.ocEmitida:
-				return FilledButton.icon(
-					onPressed: () async {
-						await _onPasoAviso(row);
-						onAfter?.call();
-					},
-					icon: const Icon(Icons.shopping_cart_checkout, size: 22, color: Colors.black87),
-					label: const Text("Compra realizada"),
-					style: compact
-							? _styleAvisoTabla(AppTokens.yellowHeader, Colors.black87)
-							: _styleAvisoCard(AppTokens.yellowHeader, Colors.black87),
-				);
-			case _EstadoAvisoPedido.compraRealizada:
-				return FilledButton.icon(
-					onPressed: () async {
-						await _onPasoAviso(row);
-						onAfter?.call();
-					},
-					icon: const Icon(Icons.inventory_2, size: 22, color: Colors.white),
-					label: const Text("En planta"),
-					style: compact
-							? _styleAvisoTabla(AppTokens.statusOk, Colors.white)
-							: _styleAvisoCard(AppTokens.statusOk, Colors.white),
-				);
-			case _EstadoAvisoPedido.enPlanta:
-				return Padding(
-					padding: EdgeInsets.symmetric(vertical: compact ? 4 : 6),
-					child: Row(
-						mainAxisSize: MainAxisSize.min,
-						children: [
-							Icon(
-								Icons.check_circle,
-								size: compact ? 22 : 24,
-								color: AppTokens.statusOk,
-							),
-							SizedBox(width: compact ? 6 : 8),
-							Text(
-								"En planta",
-								style: TextStyle(
-									color: AppTokens.statusOk,
-									fontWeight: FontWeight.w700,
-									fontSize: compact ? 13 : 14,
-								),
-							),
-						],
-					),
-				);
-		}
 	}
 
 	Widget _pedidoCardMovil(_SolicitudCompraRow row) {

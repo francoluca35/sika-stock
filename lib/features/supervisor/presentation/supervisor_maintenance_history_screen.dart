@@ -346,13 +346,11 @@ class _HistorialPedidoCard extends StatelessWidget {
 			case MaintenanceWorkflowStatus.forwardedToPanol:
 				return "En consulta con pañol: $fechaFmt";
 			case MaintenanceWorkflowStatus.panolRequestedCompras:
-				return "Solicitud enviada a compras: $fechaFmt";
 			case MaintenanceWorkflowStatus.comprasOcNotified:
-				return "En consulta — OC emitida (Compras): $fechaFmt";
 			case MaintenanceWorkflowStatus.comprasPurchaseDone:
-				return "Compra realizada: $fechaFmt";
+				return "Pedido a compras: $fechaFmt";
 			case MaintenanceWorkflowStatus.comprasArrivedNotified:
-				return "Material en planta: $fechaFmt";
+				return "Listo para retirar: $fechaFmt";
 			default:
 				return "Última actualización: $fechaFmt";
 		}

@@ -58,18 +58,10 @@ abstract final class ProviderReload {
 	}
 
 	/// Cambios en `maintenance_orders` o `compras_panol_stock_requests`.
+	/// Los listados con `.stream()` se actualizan solos vía Realtime de Supabase;
+	/// acá solo recargamos futures (historial, seguimiento, solicitudes).
 	static void onMaintenanceTablesChange(ProviderContainer container) {
-		maintenanceStreams(container);
 		maintenanceFutures(container);
-	}
-
-	static void onMaintenanceNotificationsChange(ProviderContainer container) {
-		container.invalidate(mantenimientoNotificacionesProvider);
-		container.read(mantenimientoNotificacionesProvider);
-	}
-
-	static void onComprasNotificationsChange(ProviderContainer container) {
-		comprasNotificationStream(container);
 	}
 
 	static void onStockTablesChange(ProviderContainer container) {

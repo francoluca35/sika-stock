@@ -54,8 +54,10 @@ class ProductoSeguimiento {
 	/// Eventos ordenados cronológicamente (más antiguo primero).
 	final List<SeguimientoEvento> trayecto;
 
-	bool get puedeAvisarLlegada =>
-			workflowStatus == "compras_purchase_done" &&
+	bool get puedeAvisarListoRetiro =>
+			(workflowStatus == "panol_requested_compras" ||
+					workflowStatus == "compras_oc_notified" ||
+					workflowStatus == "compras_purchase_done") &&
 			maintenanceOrderId != null &&
 			maintenanceOrderId!.isNotEmpty;
 }
@@ -74,11 +76,11 @@ Color _colorEstado(SeguimientoCompraEstado e) {
 String _etiquetaEstado(SeguimientoCompraEstado e) {
 	switch (e) {
 		case SeguimientoCompraEstado.pendienteCompra:
-			return "Sin comprar";
+			return "Pedido a compras";
 		case SeguimientoCompraEstado.comprado:
-			return "Comprado";
+			return "Pedido a compras";
 		case SeguimientoCompraEstado.entregado:
-			return "Entregado";
+			return "Listo para retirar";
 	}
 }
 
@@ -93,13 +95,13 @@ class ProductoSeguimientoPanel extends ConsumerWidget {
 
 	final List<ProductoSeguimiento> items;
 
-	static Future<void> avisarLlegadaPlanta(
+	static Future<void> avisarListoParaRetiro(
 		WidgetRef ref,
 		ProductoSeguimiento item,
 	) async {
 		final oid = item.maintenanceOrderId;
-		if (oid == null || !item.puedeAvisarLlegada) return;
-		await ref.read(comprasStockRepositoryProvider).comprasNotifyMaterialArrived(oid);
+		if (oid == null || !item.puedeAvisarListoRetiro) return;
+		await ref.read(comprasStockRepositoryProvider).panolNotifyReadyForPickup(oid);
 		ref.invalidate(panolSeguimientoComprasProvider);
 		ref.invalidate(mantenimientoNotificacionesProvider);
 	}
@@ -217,15 +219,15 @@ class ProductoSeguimientoPanel extends ConsumerWidget {
 					item: p,
 					colorEstado: c,
 					onTap: () => mostrarTrayecto(context, p),
-					onAvisarLlegada: p.puedeAvisarLlegada
+					onAvisarListoRetiro: p.puedeAvisarListoRetiro
 							? () async {
 									try {
-										await avisarLlegadaPlanta(ref, p);
+										await avisarListoParaRetiro(ref, p);
 										if (!context.mounted) return;
 										ScaffoldMessenger.of(context).showSnackBar(
 											SnackBar(
 												content: Text(
-													"Aviso enviado: ${p.producto} llegó a planta.",
+													"Aviso enviado: ${p.producto} listo para retirar.",
 												),
 											),
 										);
@@ -233,7 +235,7 @@ class ProductoSeguimientoPanel extends ConsumerWidget {
 										if (!context.mounted) return;
 										ScaffoldMessenger.of(context).showSnackBar(
 											SnackBar(
-												content: Text("No se pudo avisar la llegada: $e"),
+												content: Text("No se pudo avisar: $e"),
 											),
 										);
 									}
@@ -250,13 +252,13 @@ class _ProductoSeguimientoCard extends StatelessWidget {
 		required this.item,
 		required this.colorEstado,
 		required this.onTap,
-		this.onAvisarLlegada,
+		this.onAvisarListoRetiro,
 	});
 
 	final ProductoSeguimiento item;
 	final Color colorEstado;
 	final VoidCallback onTap;
-	final Future<void> Function()? onAvisarLlegada;
+	final Future<void> Function()? onAvisarListoRetiro;
 
 	@override
 	Widget build(BuildContext context) {
@@ -283,7 +285,7 @@ class _ProductoSeguimientoCard extends StatelessWidget {
 							borderRadius: BorderRadius.vertical(
 								top: const Radius.circular(AppTokens.radiusMd),
 								bottom: Radius.circular(
-									onAvisarLlegada != null ? 0 : AppTokens.radiusMd,
+									onAvisarListoRetiro != null ? 0 : AppTokens.radiusMd,
 								),
 							),
 							child: IntrinsicHeight(
@@ -296,7 +298,7 @@ class _ProductoSeguimientoCard extends StatelessWidget {
 												color: colorEstado,
 												borderRadius: BorderRadius.horizontal(
 													left: const Radius.circular(AppTokens.radiusMd - 1),
-													right: onAvisarLlegada != null
+													right: onAvisarListoRetiro != null
 															? Radius.zero
 															: const Radius.circular(0),
 												),
@@ -373,13 +375,13 @@ class _ProductoSeguimientoCard extends StatelessWidget {
 								),
 							),
 						),
-						if (onAvisarLlegada != null)
+						if (onAvisarListoRetiro != null)
 							Padding(
 								padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
 								child: FilledButton.icon(
-									onPressed: onAvisarLlegada,
+									onPressed: onAvisarListoRetiro,
 									icon: const Icon(Icons.inventory_2, size: 20),
-									label: const Text("Avisar llegada a planta"),
+									label: const Text("Avisar listo para retirar"),
 									style: FilledButton.styleFrom(
 										backgroundColor: AppTokens.statusOk,
 										foregroundColor: Colors.white,

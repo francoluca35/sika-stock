@@ -429,7 +429,7 @@ class _ComprasMainTab extends ConsumerWidget {
 									size: 28,
 								),
 								title: "HISTORIAL DE PEDIDOS",
-								subtitle: "Ver el historial de pedidos realizados",
+								subtitle: "Solicitudes de pañol (solo consulta)",
 								onTap: onHistorialPedidos,
 							),
 							const SizedBox(height: 12),

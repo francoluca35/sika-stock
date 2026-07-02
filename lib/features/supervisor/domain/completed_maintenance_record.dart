@@ -21,10 +21,10 @@ class CompletedMaintenanceRecord {
 		final motivo = switch (ws) {
 			MaintenanceWorkflowStatus.completed => "Entregado",
 			MaintenanceWorkflowStatus.forwardedToPanol => "Consulta con pañol",
-			MaintenanceWorkflowStatus.panolRequestedCompras => "Seguimiento con compras",
-			MaintenanceWorkflowStatus.comprasOcNotified => "Consulta (OC emitida)",
-			MaintenanceWorkflowStatus.comprasPurchaseDone => "Compra realizada",
-			MaintenanceWorkflowStatus.comprasArrivedNotified => "Material en planta",
+			MaintenanceWorkflowStatus.panolRequestedCompras => "Pedido a compras",
+			MaintenanceWorkflowStatus.comprasOcNotified => "Pedido a compras",
+			MaintenanceWorkflowStatus.comprasPurchaseDone => "Pedido a compras",
+			MaintenanceWorkflowStatus.comprasArrivedNotified => "Listo para retirar",
 			MaintenanceWorkflowStatus.cancelled => "Cancelado",
 			_ => "Cerrado",
 		};

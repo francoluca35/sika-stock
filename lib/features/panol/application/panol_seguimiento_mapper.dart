@@ -13,10 +13,6 @@ SeguimientoCompraEstado seguimientoEstadoDesdeWorkflow(String? ws) {
 	switch (ws) {
 		case "compras_arrived_notified":
 			return SeguimientoCompraEstado.entregado;
-		case "compras_purchase_done":
-			return SeguimientoCompraEstado.comprado;
-		case "compras_oc_notified":
-			return SeguimientoCompraEstado.pendienteCompra;
 		default:
 			return SeguimientoCompraEstado.pendienteCompra;
 	}
@@ -45,38 +41,15 @@ ProductoSeguimiento productoSeguimientoDesdeComprasRequest(
 
 	trayecto.add(
 		SeguimientoEvento(
-			titulo: "Pañol solicitó material a compras (${r.quantity} u.)",
+			titulo: "Pañol registró pedido a compras (${r.quantity} u.)",
 			cuando: r.createdAt,
 		),
 	);
 
-	if (ws == "compras_oc_notified" ||
-			ws == "compras_purchase_done" ||
-			ws == "compras_arrived_notified" ||
-			ws == "completed") {
-		trayecto.add(
-			SeguimientoEvento(
-				titulo: "Compras emitió orden de compra",
-				cuando: r.maintenanceUpdatedAt ?? r.createdAt,
-			),
-		);
-	}
-
-	if (ws == "compras_purchase_done" ||
-			ws == "compras_arrived_notified" ||
-			ws == "completed") {
-		trayecto.add(
-			SeguimientoEvento(
-				titulo: "Compra realizada",
-				cuando: r.maintenanceUpdatedAt ?? r.createdAt,
-			),
-		);
-	}
-
 	if (ws == "compras_arrived_notified" || ws == "completed") {
 		trayecto.add(
 			SeguimientoEvento(
-				titulo: "Material recibido en planta",
+				titulo: "Pañol avisó: listo para retirar",
 				cuando: r.maintenanceUpdatedAt ?? r.createdAt,
 			),
 		);

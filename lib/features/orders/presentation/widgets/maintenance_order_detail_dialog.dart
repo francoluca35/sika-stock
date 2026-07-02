@@ -91,13 +91,12 @@ String _workflowLabel(MaintenanceWorkflowStatus w) {
 		case MaintenanceWorkflowStatus.forwardedToPanol:
 			return "Derivado a pañol";
 		case MaintenanceWorkflowStatus.panolRequestedCompras:
-			return "En compras (solicitado por pañol)";
+			return "Pedido a compras (pañol)";
 		case MaintenanceWorkflowStatus.comprasOcNotified:
-			return "OC emitida por compras";
 		case MaintenanceWorkflowStatus.comprasPurchaseDone:
-			return "Compra realizada";
+			return "Pedido a compras (en gestión)";
 		case MaintenanceWorkflowStatus.comprasArrivedNotified:
-			return "Material en planta";
+			return "Listo para retirar";
 		case MaintenanceWorkflowStatus.completed:
 			return "Completado";
 		case MaintenanceWorkflowStatus.cancelled:

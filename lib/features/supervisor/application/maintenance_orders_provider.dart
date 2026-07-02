@@ -2,8 +2,6 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../auth/application/auth_providers.dart";
 import "../../auth/application/auth_session_provider.dart";
-import "../../orders/application/mantenimiento_notificaciones_provider.dart";
-import "../../panol/application/panol_forwarded_orders_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../data/maintenance_orders_repository.dart";
 import "../domain/maintenance_order.dart";
@@ -130,15 +128,10 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 	}
 
 	/// Pedido sale de «activos» y el historial debe mostrar el registro nuevo.
+	/// Los streams (pedidos activos, pañol, notificaciones) se actualizan solos vía Realtime.
 	void _afterWorkflowChange() {
-		ref.invalidate(maintenanceOrdersProvider);
-		ref.read(maintenanceOrdersProvider);
 		ref.invalidate(supervisorMaintenanceHistoryProvider);
 		ref.read(supervisorMaintenanceHistoryProvider);
-		ref.invalidate(panolForwardedOrdersProvider);
-		ref.read(panolForwardedOrdersProvider);
-		ref.invalidate(mantenimientoNotificacionesProvider);
-		ref.read(mantenimientoNotificacionesProvider);
 	}
 }
 

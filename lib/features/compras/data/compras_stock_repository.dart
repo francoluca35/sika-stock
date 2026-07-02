@@ -73,7 +73,7 @@ class ComprasStockRepository {
 				.eq("kind", "panol_stock_request");
 	}
 
-	/// Pañol: registra solicitud a Compras (dispara notificaciones vía trigger en BD).
+	/// Pañol: registra solicitud a compras (dispara notificaciones vía trigger en BD).
 	Future<void> createPanolStockRequestFromMaintenanceOrder(MaintenanceOrder order) async {
 		final uid = _client.auth.currentUser?.id;
 		if (uid == null) {
@@ -92,30 +92,22 @@ class ComprasStockRepository {
 		});
 	}
 
-	/// Compras: registra que se emitió la OC / pre-aprobación.
-	Future<void> comprasNotifyOcEmitted(String maintenanceOrderId) async {
-		await _client
-				.from("maintenance_orders")
-				.update({"workflow_status": "compras_oc_notified"})
-				.eq("id", maintenanceOrderId)
-				.eq("workflow_status", "panol_requested_compras");
-	}
-
-	/// Compras: registra que la compra fue realizada.
-	Future<void> comprasNotifyPurchaseDone(String maintenanceOrderId) async {
-		await _client
-				.from("maintenance_orders")
-				.update({"workflow_status": "compras_purchase_done"})
-				.eq("id", maintenanceOrderId)
-				.eq("workflow_status", "compras_oc_notified");
-	}
-
-	/// Compras o Pañol: confirma llegada del material a planta.
-	Future<void> comprasNotifyMaterialArrived(String maintenanceOrderId) async {
-		await _client
-				.from("maintenance_orders")
-				.update({"workflow_status": "compras_arrived_notified"})
-				.eq("id", maintenanceOrderId)
-				.eq("workflow_status", "compras_purchase_done");
+	/// Pañol: avisa que el material está listo para retirar.
+	Future<void> panolNotifyReadyForPickup(String maintenanceOrderId) async {
+		const fromStates = [
+			"panol_requested_compras",
+			"compras_oc_notified",
+			"compras_purchase_done",
+		];
+		for (final from in fromStates) {
+			final res = await _client
+					.from("maintenance_orders")
+					.update({"workflow_status": "compras_arrived_notified"})
+					.eq("id", maintenanceOrderId)
+					.eq("workflow_status", from)
+					.select("id");
+			if ((res as List).isNotEmpty) return;
+		}
+		throw Exception("El pedido no está en un estado que permita avisar retiro.");
 	}
 }
