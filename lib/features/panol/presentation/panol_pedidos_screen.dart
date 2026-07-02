@@ -12,14 +12,9 @@ import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../supervisor/domain/maintenance_order.dart";
-import "../../compras/application/compras_in_app_notifications_provider.dart";
-import "../../compras/application/compras_panol_stock_requests_provider.dart";
 import "../../compras/application/compras_stock_repository_provider.dart";
-import "../../orders/application/mantenimiento_notificaciones_provider.dart";
-import "../../orders/application/mis_pedidos_mantenimiento_provider.dart";
 import "../../orders/presentation/widgets/maintenance_order_detail_dialog.dart";
 import "../../supervisor/application/maintenance_orders_provider.dart";
-import "../../supervisor/application/supervisor_maintenance_history_provider.dart";
 import "widgets/panol_agregar_stock_dialog.dart";
 
 bool _panolPedidosLayoutCompact(BuildContext context) =>
@@ -401,9 +396,9 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																					.createPanolStockRequestFromMaintenanceOrder(
 																						mo,
 																					);
-																			ref.invalidate(comprasPanolStockRequestsProvider);
-																			ref.invalidate(comprasInAppNotificationsProvider);
-																			ref.invalidate(panolForwardedOrdersProvider);
+																			await ref
+																					.read(panolForwardedOrdersProvider.notifier)
+																					.refresh(silent: true);
 																			if (!context.mounted) return;
 																			ScaffoldMessenger.of(context).showSnackBar(
 																				SnackBar(
@@ -468,12 +463,12 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																								dialogResult.stockItemId,
 																						cantidad: dialogResult.cantidad,
 																					);
-																			ref.invalidate(panolForwardedOrdersProvider);
-																			ref.invalidate(maintenanceOrdersProvider);
-																			ref.invalidate(misPedidosMantenimientoProvider);
-																			ref.invalidate(mantenimientoNotificacionesProvider);
-																			ref.invalidate(supervisorMaintenanceHistoryProvider);
-																			ref.invalidate(supervisorStockCatalogProvider);
+																			await ref
+																					.read(panolForwardedOrdersProvider.notifier)
+																					.refresh(silent: true);
+																			await ref
+																					.read(supervisorStockCatalogProvider.notifier)
+																					.refresh();
 																			if (!context.mounted) return;
 																			ScaffoldMessenger.of(context).showSnackBar(
 																				SnackBar(
@@ -516,11 +511,20 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																						maintenanceOrdersRepositoryProvider,
 																					)
 																					.markCompleted(mo.id);
-																			ref.invalidate(panolForwardedOrdersProvider);
+																			await ref
+																					.read(panolForwardedOrdersProvider.notifier)
+																					.refresh(silent: true);
 																			ref.invalidate(panolOrderHistoryProvider);
-																			ref.invalidate(maintenanceOrdersProvider);
-																			ref.invalidate(supervisorMaintenanceHistoryProvider);
-																			ref.invalidate(supervisorStockCatalogProvider);
+																			ref.read(panolOrderHistoryProvider);
+																			if (mo.stockItemId != null &&
+																					mo.stockItemId!.isNotEmpty) {
+																				await ref
+																						.read(
+																							supervisorStockCatalogProvider
+																									.notifier,
+																						)
+																						.refresh();
+																			}
 																			if (!context.mounted) return;
 																			final desconto = mo.stockItemId != null &&
 																					mo.stockItemId!.isNotEmpty;
