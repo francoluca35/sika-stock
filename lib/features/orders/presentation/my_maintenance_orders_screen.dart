@@ -8,6 +8,7 @@ import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../supervisor/domain/maintenance_order.dart";
 import "../application/mis_pedidos_mantenimiento_provider.dart";
 import "widgets/maintenance_order_seguimiento_sheet.dart";
+import "widgets/maintenance_order_timeline.dart";
 
 String _estadoMantenimientoTexto(MaintenanceWorkflowStatus w) {
 	switch (w) {
@@ -93,7 +94,11 @@ class MyMaintenanceOrdersScreen extends ConsumerWidget {
 													borderRadius: BorderRadius.circular(
 														AppTokens.radiusMd,
 													),
-													onTap: () => showMaintenanceOrderSeguimientoSheet(context, o),
+													onTap: () => showMaintenanceOrderSeguimientoSheet(
+														context,
+														o,
+														ref: ref,
+													),
 													child: Card(
 														elevation: 0,
 														color: AppTokens.whiteSurface,
@@ -121,6 +126,10 @@ class MyMaintenanceOrdersScreen extends ConsumerWidget {
 																		style: const TextStyle(fontSize: 14),
 																	),
 																	const SizedBox(height: 8),
+																	MaintenanceOrderProgressBar(
+																		status: o.workflowStatus,
+																	),
+																	const SizedBox(height: 6),
 																	Text(
 																		_estadoMantenimientoTexto(o.workflowStatus),
 																		style: TextStyle(

@@ -12,6 +12,7 @@ import "../../stock/domain/stock_product.dart";
 import "../application/maintenance_orders_provider.dart";
 import "../application/maintenance_stock_similarity.dart"
 		show analizarStockLineaExacta, analizarStockPedido, stockSimilarToPedido;
+import "../../orders/application/order_navigation_target_provider.dart";
 import "../domain/maintenance_order.dart";
 
 /// Tabla de **pedidos de mantenimiento** para supervisor (lista mockup).
@@ -789,6 +790,19 @@ class _SupervisorMaintenanceOrdersScreenState
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<String?>(orderNavigationTargetProvider, (prev, next) {
+      if (next == null || next == prev) return;
+      final orders = ref.read(maintenanceOrdersProvider).value;
+      if (orders == null) return;
+      final match = orders.where((o) => o.id == next).firstOrNull;
+      if (match == null) return;
+      ref.read(orderNavigationTargetProvider.notifier).setTarget(null);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _mostrarDetalle(context, match);
+      });
+    });
+
     final asyncPedidos = ref.watch(maintenanceOrdersProvider);
     final catalogAsync = ref.watch(supervisorStockCatalogProvider);
     return asyncPedidos.when(

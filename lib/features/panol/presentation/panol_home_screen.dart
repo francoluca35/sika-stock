@@ -6,6 +6,7 @@ import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
+import "../../orders/presentation/widgets/role_status_dashboard.dart";
 
 /// Pantalla inicial **Pañol**: solo accesos; cada uno abre su propia pantalla.
 class PanolHomeScreen extends ConsumerWidget {
@@ -35,6 +36,8 @@ class PanolHomeScreen extends ConsumerWidget {
 										crossAxisAlignment: CrossAxisAlignment.stretch,
 										children: [
 											const MaintenanceNotificationsBlock(),
+											const SizedBox(height: 12),
+											const RoleStatusDashboard(),
 											const SizedBox(height: 12),
 											Text(
 												"Seleccioná una opción",

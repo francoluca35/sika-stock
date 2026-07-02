@@ -8,6 +8,7 @@ import "../../admin/presentation/widgets/admin_shell_bottom_bar.dart";
 import "../../auth/application/auth_providers.dart";
 import "../../auth/domain/profile_row.dart";
 import "../../orders/presentation/widgets/maintenance_notifications_block.dart";
+import "../../orders/presentation/widgets/role_status_dashboard.dart";
 import "../application/maintenance_orders_provider.dart";
 
 /// Pantalla inicial **Supervisor**: accesos rápidos a pedidos, stock y seguimiento.
@@ -67,6 +68,8 @@ class SupervisorHomeScreen extends ConsumerWidget {
 												crossAxisAlignment: CrossAxisAlignment.stretch,
 												children: [
 													const MaintenanceNotificationsBlock(),
+													const SizedBox(height: 12),
+													const RoleStatusDashboard(),
 													const SizedBox(height: 12),
 													Text(
 														"Bienvenido, $nombre",

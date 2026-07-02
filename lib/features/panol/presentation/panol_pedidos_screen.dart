@@ -11,6 +11,8 @@ import "../application/panol_order_history_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
+import "../../orders/application/order_navigation_target_provider.dart";
+import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../supervisor/domain/maintenance_order.dart";
 import "../../compras/application/compras_stock_repository_provider.dart";
 import "../../orders/presentation/widgets/maintenance_order_detail_dialog.dart";
@@ -162,6 +164,19 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 
 	@override
 	Widget build(BuildContext context) {
+		ref.listen<String?>(orderNavigationTargetProvider, (prev, next) {
+			if (next == null || next == prev) return;
+			final orders = ref.read(panolForwardedOrdersProvider).value;
+			if (orders == null) return;
+			final match = orders.where((o) => o.id == next).firstOrNull;
+			if (match == null) return;
+			ref.read(orderNavigationTargetProvider.notifier).setTarget(null);
+			WidgetsBinding.instance.addPostFrameCallback((_) {
+				if (!mounted) return;
+				showMaintenanceOrderSeguimientoSheet(context, match, ref: ref);
+			});
+		});
+
 		final stocksAsync = ref.watch(supervisorStockCatalogProvider);
 		final consultar = ref.watch(panolForwardedOrdersProvider);
 		final consultas = consultar.maybeWhen(
