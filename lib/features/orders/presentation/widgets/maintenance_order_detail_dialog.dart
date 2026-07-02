@@ -3,6 +3,7 @@ import "package:flutter/material.dart";
 import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../supervisor/domain/maintenance_order.dart";
+import "maintenance_order_timeline.dart";
 import "maintenance_order_photo_dialog.dart";
 
 /// Modal con el detalle completo de un pedido de mantenimiento.
@@ -42,6 +43,16 @@ void showMaintenanceOrderDetalleDialog(
 							_DetalleFila(label: "Observación", valor: order.observacion),
 						_DetalleFila(label: "Solicitante", valor: order.solicitante),
 						_DetalleFila(label: "Estado", valor: _workflowLabel(order.workflowStatus)),
+						const SizedBox(height: 12),
+						const Text(
+							"Línea de tiempo",
+							style: TextStyle(
+								fontWeight: FontWeight.w800,
+								fontSize: 13,
+							),
+						),
+						const SizedBox(height: 8),
+						MaintenanceOrderTimeline(order: order, compact: true),
 						if (stockCatalogoCantidad != null)
 							_DetalleFila(
 								label: "Stock en catálogo (aprox.)",

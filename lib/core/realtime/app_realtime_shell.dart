@@ -2,6 +2,8 @@ import "dart:async";
 
 import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
+import "package:go_router/go_router.dart";
+
 import "../notifications/local_notification_service.dart";
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/application/auth_session_provider.dart";
@@ -9,6 +11,9 @@ import "../../features/auth/domain/app_role.dart";
 import "../../features/compras/application/compras_in_app_notifications_provider.dart";
 import "../../features/compras/domain/compras_in_app_notification_row.dart";
 import "../../features/orders/application/mantenimiento_notificaciones_provider.dart";
+import "../../features/orders/application/order_navigation_target_provider.dart";
+import "../../features/orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
+import "../../features/orders/presentation/widgets/order_notification_actions.dart";
 import "../../features/panol/application/panol_forwarded_orders_provider.dart";
 import "../../features/supervisor/application/maintenance_orders_provider.dart";
 import "../../features/supervisor/domain/maintenance_order.dart";
@@ -73,6 +78,7 @@ class _LiveNotificationListenerState
     required String idKey,
     required String title,
     required String body,
+    SnackBarAction? action,
   }) {
     if (mounted) {
       final messenger = ScaffoldMessenger.maybeOf(context);
@@ -92,8 +98,9 @@ class _LiveNotificationListenerState
                 Text(body),
               ],
             ),
-            duration: const Duration(seconds: 6),
+            duration: const Duration(seconds: 8),
             behavior: SnackBarBehavior.floating,
+            action: action,
           ),
         );
       }
@@ -107,6 +114,70 @@ class _LiveNotificationListenerState
     );
   }
 
+  SnackBarAction? _snackActionVerPedido(String orderId) {
+    return SnackBarAction(
+      label: "Ver pedido",
+      onPressed: () async {
+        final order = await ref
+            .read(maintenanceOrdersRepositoryProvider)
+            .fetchOrderById(orderId);
+        if (!mounted || order == null) return;
+        showMaintenanceOrderSeguimientoSheet(context, order, ref: ref);
+      },
+    );
+  }
+
+  SnackBarAction? _snackActionAprobarStock(String orderId) {
+    return SnackBarAction(
+      label: "Aprobar stock",
+      onPressed: () {
+        ref.read(orderNavigationTargetProvider.notifier).setTarget(orderId);
+        context.push("/supervisor/pedidos-mantenimiento");
+      },
+    );
+  }
+
+  SnackBarAction? _snackActionMarcarRetiro(String orderId) {
+    return SnackBarAction(
+      label: "Marcar retiro",
+      onPressed: () async {
+        final order = await ref
+            .read(maintenanceOrdersRepositoryProvider)
+            .fetchOrderById(orderId);
+        if (!mounted || order == null) return;
+        await handleOrderNotificationAction(
+          context: context,
+          ref: ref,
+          action: const OrderNotificationAction(
+            kind: OrderNotificationActionKind.marcarRetiro,
+            label: "Marcar retiro",
+          ),
+          orderId: orderId,
+          order: order,
+        );
+      },
+    );
+  }
+
+  SnackBarAction? _primarySnackActionForNotification(
+    MaintenanceOrderNotificationRow n,
+  ) {
+    final role = ref.read(currentProfileProvider).value?.rol;
+    if (role == AppRole.panol ||
+        role == AppRole.admin ||
+        role == AppRole.superadmin) {
+      if (n.kind == "panol_atento_retiro" || n.kind == "material_llego_planta") {
+        return _snackActionMarcarRetiro(n.orderId);
+      }
+    }
+    if (role == AppRole.supervisor ||
+        role == AppRole.admin ||
+        role == AppRole.superadmin) {
+      return _snackActionAprobarStock(n.orderId);
+    }
+    return _snackActionVerPedido(n.orderId);
+  }
+
   void _onMaintNotifications(List<MaintenanceOrderNotificationRow> list) {
     if (!_maintNotifPrimed) {
       _seenMaintNotifIds.addAll(list.map((e) => e.id));
@@ -116,7 +187,12 @@ class _LiveNotificationListenerState
     for (final n in list) {
       if (_seenMaintNotifIds.contains(n.id)) continue;
       _seenMaintNotifIds.add(n.id);
-      _alert(idKey: "mon-${n.id}", title: n.title, body: n.body);
+      _alert(
+        idKey: "mon-${n.id}",
+        title: n.title,
+        body: n.body,
+        action: _primarySnackActionForNotification(n),
+      );
     }
   }
 
@@ -162,6 +238,7 @@ class _LiveNotificationListenerState
           idKey: "mo-${o.id}",
           title: "Nuevo pedido de mantenimiento",
           body: "${o.numeroOrden}: ${o.producto}",
+          action: _snackActionAprobarStock(o.id),
         );
       }
     }
@@ -182,6 +259,7 @@ class _LiveNotificationListenerState
           idKey: "panol-${o.id}",
           title: "Nuevo pedido en pañol",
           body: "${o.numeroOrden}: ${o.producto}",
+          action: _snackActionVerPedido(o.id),
         );
       }
     }

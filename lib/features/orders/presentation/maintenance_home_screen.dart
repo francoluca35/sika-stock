@@ -7,6 +7,7 @@ import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
 import "widgets/maintenance_notifications_block.dart";
 import "widgets/order_hub_bottom_bar.dart";
+import "widgets/role_status_dashboard.dart";
 
 /// Inicio del rol **Mantenimiento**: hacer pedido e historial de pedidos (sin hub de gestión de stock).
 class MaintenanceHomeScreen extends ConsumerWidget {
@@ -38,6 +39,8 @@ class MaintenanceHomeScreen extends ConsumerWidget {
 										crossAxisAlignment: CrossAxisAlignment.stretch,
 										children: [
 											const MaintenanceNotificationsBlock(),
+											const SizedBox(height: 12),
+											const RoleStatusDashboard(),
 											const SizedBox(height: 8),
 											Text(
 												"Pedidos de mantenimiento",
