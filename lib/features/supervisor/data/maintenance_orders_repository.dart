@@ -13,6 +13,17 @@ class MaintenanceOrdersRepository {
 
 	static const String _photoBucket = "maintenance-order-photos";
 
+	/// Listados: sin URL de imagen (se resuelve al abrir detalle).
+	static const _selectListCols =
+			"id, order_number, created_at, updated_at, created_by, solicitante_display, "
+			"product_name, quantity, product_type, priority, destination, observacion, "
+			"workflow_status, stock_item_id";
+
+	static const _selectDetailCols = "$_selectListCols, imagen_url";
+
+	static const _limitActive = 50;
+	static const _limitHistory = 30;
+
 	Future<void> createOrder({
 		required String solicitanteDisplay,
 		required String productName,
@@ -153,7 +164,11 @@ class MaintenanceOrdersRepository {
 	}
 
 	Future<MaintenanceOrder?> fetchOrderById(String id) async {
-		final row = await _client.from("maintenance_orders").select().eq("id", id).maybeSingle();
+		final row = await _client
+				.from("maintenance_orders")
+				.select(_selectDetailCols)
+				.eq("id", id)
+				.maybeSingle();
 		if (row == null) return null;
 		return MaintenanceOrder.fromJson(Map<String, dynamic>.from(row));
 	}
@@ -161,7 +176,7 @@ class MaintenanceOrdersRepository {
 	Future<List<MaintenanceOrder>> fetchSupervisorHistory() async {
 		final rows = await _client
 				.from("maintenance_orders")
-				.select()
+				.select(_selectListCols)
 				.inFilter("workflow_status", [
 					"completed",
 					"forwarded_to_panol",
@@ -171,27 +186,29 @@ class MaintenanceOrdersRepository {
 					"compras_arrived_notified",
 					"cancelled",
 				])
-				.order("updated_at", ascending: false);
+				.order("updated_at", ascending: false)
+				.limit(_limitHistory);
 		return _mapList(rows);
 	}
 
 	Future<List<MaintenanceOrder>> fetchSupervisorActive() async {
 		final rows = await _client
 				.from("maintenance_orders")
-				.select()
+				.select(_selectListCols)
 				.inFilter("workflow_status", [
 					"pending_supervisor",
 					"supervisor_stock_ok",
 					"compras_arrived_notified",
 				])
-				.order("created_at", ascending: false);
+				.order("created_at", ascending: false)
+				.limit(_limitActive);
 		return _mapList(rows);
 	}
 
 	Future<List<MaintenanceOrder>> fetchForwardedForPanol() async {
 		final rows = await _client
 				.from("maintenance_orders")
-				.select()
+				.select(_selectListCols)
 				.inFilter("workflow_status", [
 					"forwarded_to_panol",
 					"panol_requested_compras",
@@ -200,7 +217,8 @@ class MaintenanceOrdersRepository {
 					"compras_arrived_notified",
 					"supervisor_stock_ok",
 				])
-				.order("created_at", ascending: false);
+				.order("created_at", ascending: false)
+				.limit(_limitActive);
 		return _mapList(rows);
 	}
 
@@ -208,9 +226,10 @@ class MaintenanceOrdersRepository {
 	Future<List<MaintenanceOrder>> fetchPanolOrderHistory() async {
 		final rows = await _client
 				.from("maintenance_orders")
-				.select()
+				.select(_selectListCols)
 				.inFilter("workflow_status", ["completed", "cancelled"])
-				.order("updated_at", ascending: false);
+				.order("updated_at", ascending: false)
+				.limit(_limitHistory);
 		return _mapList(rows);
 	}
 
@@ -219,9 +238,10 @@ class MaintenanceOrdersRepository {
 		if (uid == null) return [];
 		final rows = await _client
 				.from("maintenance_orders")
-				.select()
+				.select(_selectListCols)
 				.eq("created_by", uid)
-				.order("created_at", ascending: false);
+				.order("created_at", ascending: false)
+				.limit(_limitActive);
 		return _mapList(rows);
 	}
 
@@ -319,7 +339,7 @@ class MaintenanceOrdersRepository {
 		if (uid == null) return [];
 		final rows = await _client
 				.from("maintenance_order_notifications")
-				.select()
+				.select("id, user_id, order_id, kind, title, body, created_at, read_at")
 				.eq("user_id", uid)
 				.order("created_at", ascending: false)
 				.limit(limit);

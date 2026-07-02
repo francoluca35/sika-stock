@@ -183,8 +183,7 @@ class _PlaceOrderScreenState extends ConsumerState<PlaceOrderScreen> {
 						observacion: _observacionCtrl.text.trim(),
 						photoJpeg: _photoJpeg,
 					);
-			ref.invalidate(maintenanceOrdersProvider);
-			ref.invalidate(misPedidosMantenimientoProvider);
+			await ref.read(misPedidosMantenimientoProvider.notifier).refresh();
 			if (!mounted) return;
 			ScaffoldMessenger.of(context).showSnackBar(
 				const SnackBar(

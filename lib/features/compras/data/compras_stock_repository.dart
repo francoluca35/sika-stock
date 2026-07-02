@@ -9,12 +9,23 @@ class ComprasStockRepository {
 
 	final SupabaseClient _client;
 
+	static const _cpsrSelect =
+			"id, created_at, maintenance_order_id, order_number, product_name, quantity, "
+			"priority, destination, solicitante_display, panol_user_id, imagen_url, "
+			"maintenance_orders(workflow_status, created_at, updated_at)";
+
+	static const _cinSelect =
+			"id, created_at, user_id, kind, ref_id, title, body, read_at";
+
+	static const _limitRequests = 50;
+
 	/// Solicitudes ordenadas por más reciente primero (historial Compras).
 	Future<List<ComprasPanolStockRequestRow>> fetchPanolStockRequests() async {
 		final raw = await _client
 				.from("compras_panol_stock_requests")
-				.select("*, maintenance_orders(workflow_status, created_at, updated_at)")
-				.order("created_at", ascending: false);
+				.select(_cpsrSelect)
+				.order("created_at", ascending: false)
+				.limit(_limitRequests);
 		final list = raw as List? ?? [];
 		return list
 				.map((e) => ComprasPanolStockRequestRow.fromJson(Map<String, dynamic>.from(e as Map)))
@@ -26,7 +37,7 @@ class ComprasStockRepository {
 		if (uid == null) return [];
 		final raw = await _client
 				.from("compras_in_app_notifications")
-				.select()
+				.select(_cinSelect)
 				.eq("user_id", uid)
 				.order("created_at", ascending: false)
 				.limit(limit);

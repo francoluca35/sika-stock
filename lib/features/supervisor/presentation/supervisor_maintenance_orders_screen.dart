@@ -7,10 +7,8 @@ import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../orders/presentation/widgets/maintenance_order_photo_dialog.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
-import "../../panol/application/panol_forwarded_orders_provider.dart";
 import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
-import "../../orders/application/mantenimiento_notificaciones_provider.dart";
 import "../application/maintenance_orders_provider.dart";
 import "../application/maintenance_stock_similarity.dart"
 		show analizarStockLineaExacta, analizarStockPedido, stockSimilarToPedido;
@@ -765,10 +763,6 @@ class _SupervisorMaintenanceOrdersScreenState
             hayStock: hayStock,
             stockItemId: stockItemId,
           );
-      if (!hayStock) {
-        ref.invalidate(panolForwardedOrdersProvider);
-      }
-      ref.invalidate(mantenimientoNotificacionesProvider);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

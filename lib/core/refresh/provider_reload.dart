@@ -55,9 +55,11 @@ abstract final class ProviderReload {
 	}
 
 	static void onMaintenanceTablesChange(ProviderContainer container) {
+		// Solo historial/seguimiento/compras: no se llama desde Realtime.
 		maintenanceFutures(container);
 	}
 
+	/// Stock: solo refresh manual (⟳) o tras edición local; sin Realtime.
 	static void onStockTablesChange(ProviderContainer container) {
 		stockCatalog(container);
 		stockCategories(container);

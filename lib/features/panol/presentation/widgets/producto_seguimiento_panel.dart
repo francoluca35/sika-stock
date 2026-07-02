@@ -6,7 +6,7 @@ import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../compras/application/compras_stock_repository_provider.dart";
 import "../../../compras/presentation/widgets/compras_screen_metrics.dart";
-import "../../../orders/application/mantenimiento_notificaciones_provider.dart";
+import "../../application/panol_forwarded_orders_provider.dart";
 import "../../application/panol_seguimiento_compras_provider.dart";
 
 /// Estado agregado del producto en el flujo compra → entrega.
@@ -102,8 +102,9 @@ class ProductoSeguimientoPanel extends ConsumerWidget {
 		final oid = item.maintenanceOrderId;
 		if (oid == null || !item.puedeAvisarListoRetiro) return;
 		await ref.read(comprasStockRepositoryProvider).panolNotifyReadyForPickup(oid);
+		await ref.read(panolForwardedOrdersProvider.notifier).refresh(silent: true);
 		ref.invalidate(panolSeguimientoComprasProvider);
-		ref.invalidate(mantenimientoNotificacionesProvider);
+		ref.read(panolSeguimientoComprasProvider);
 	}
 
 	static void mostrarTrayecto(BuildContext context, ProductoSeguimiento p) {
