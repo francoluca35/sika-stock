@@ -11,39 +11,30 @@ final maintenanceOrdersRepositoryProvider = Provider<MaintenanceOrdersRepository
 	(ref) => MaintenanceOrdersRepository(ref.watch(supabaseClientProvider)),
 );
 
-const _supervisorActiveStatuses = {
-	MaintenanceWorkflowStatus.pendingSupervisor,
-	MaintenanceWorkflowStatus.supervisorStockOk,
-	MaintenanceWorkflowStatus.comprasArrivedNotified,
-};
-
-List<MaintenanceOrder> _mapSupervisorActiveRows(List<Map<String, dynamic>> rows) {
-	return rows
-			.map((m) => MaintenanceOrder.fromJson(Map<String, dynamic>.from(m)))
-			.where((o) => _supervisorActiveStatuses.contains(o.workflowStatus))
-			.toList();
-}
-
-/// Pedidos activos para supervisor (stream Supabase + Realtime).
+/// Pedidos activos para supervisor (HTTP; actualización manual o Realtime global).
 final maintenanceOrdersProvider =
-		StreamNotifierProvider<MaintenanceOrdersNotifier, List<MaintenanceOrder>>(
+		AsyncNotifierProvider<MaintenanceOrdersNotifier, List<MaintenanceOrder>>(
 	MaintenanceOrdersNotifier.new,
 );
 
-class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
+class MaintenanceOrdersNotifier extends AsyncNotifier<List<MaintenanceOrder>> {
 	@override
-	Stream<List<MaintenanceOrder>> build() {
+	Future<List<MaintenanceOrder>> build() async {
 		ref.keepAlive();
 		final session = ref.watch(authSessionProvider);
-		if (session == null) {
-			return Stream.value(const []);
+		if (session == null) return const [];
+		return ref.read(maintenanceOrdersRepositoryProvider).fetchSupervisorActive();
+	}
+
+	Future<void> refresh({bool silent = false}) async {
+		if (!silent) {
+			state = const AsyncValue.loading();
 		}
-		final client = ref.watch(supabaseClientProvider);
-		return client
-				.from("maintenance_orders")
-				.stream(primaryKey: ["id"])
-				.order("created_at", ascending: false)
-				.map(_mapSupervisorActiveRows);
+		state = await AsyncValue.guard(() async {
+			final session = ref.read(authSessionProvider);
+			if (session == null) return const <MaintenanceOrder>[];
+			return ref.read(maintenanceOrdersRepositoryProvider).fetchSupervisorActive();
+		});
 	}
 
 	Future<void> supervisorDecideStock({
@@ -60,7 +51,7 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 		if (hayStock && stockItemId != null && stockItemId.isNotEmpty) {
 			ref.read(supervisorStockCatalogProvider.notifier).refresh();
 		}
-		_afterWorkflowChange();
+		await _afterWorkflowChange();
 	}
 
 	Future<void> supervisorCreateFromCatalogAndDecide({
@@ -95,10 +86,9 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 		final exists = list.any((o) => o.id == orderId);
 		if (!exists) return;
 		await ref.read(maintenanceOrdersRepositoryProvider).markCompleted(orderId);
-		_afterRetiroInventoryChange();
+		await _afterRetiroInventoryChange();
 	}
 
-	/// RETIRO OK: solo avisa (→ supervisor_stock_ok). Pañol registra retiro y descuenta.
 	Future<void> confirmarRetiroOk({
 		required MaintenanceOrder order,
 		String? stockItemId,
@@ -119,23 +109,21 @@ class MaintenanceOrdersNotifier extends StreamNotifier<List<MaintenanceOrder>> {
 					hayStock: true,
 					stockItemId: sid,
 				);
-		_afterWorkflowChange();
+		await _afterWorkflowChange();
 	}
 
-	void _afterRetiroInventoryChange() {
+	Future<void> _afterRetiroInventoryChange() async {
 		ref.read(supervisorStockCatalogProvider.notifier).refresh();
-		_afterWorkflowChange();
+		await _afterWorkflowChange();
 	}
 
-	/// Pedido sale de «activos» y el historial debe mostrar el registro nuevo.
-	/// Los streams (pedidos activos, pañol, notificaciones) se actualizan solos vía Realtime.
-	void _afterWorkflowChange() {
+	Future<void> _afterWorkflowChange() async {
+		await refresh(silent: true);
 		ref.invalidate(supervisorMaintenanceHistoryProvider);
 		ref.read(supervisorMaintenanceHistoryProvider);
 	}
 }
 
-/// Cantidad de pedidos en **pending_supervisor**.
 final supervisorPendingMaintenanceBadgeProvider = Provider<int>((ref) {
 	final async = ref.watch(maintenanceOrdersProvider);
 	return async.maybeWhen(

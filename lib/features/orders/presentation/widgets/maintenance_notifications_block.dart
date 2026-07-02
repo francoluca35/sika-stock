@@ -34,7 +34,7 @@ class MaintenanceNotificationsBlock extends ConsumerWidget {
 			await ref
 					.read(maintenanceOrdersRepositoryProvider)
 					.dismissAllMyNotifications();
-			ref.invalidate(mantenimientoNotificacionesProvider);
+			ref.read(mantenimientoNotificacionesProvider.notifier).refresh();
 		} catch (e) {
 			if (!context.mounted) return;
 			ScaffoldMessenger.of(context).showSnackBar(
@@ -170,9 +170,11 @@ class MaintenanceNotificationsBlock extends ConsumerWidget {
 																			maintenanceOrdersRepositoryProvider,
 																		)
 																		.dismissNotification(n.id);
-																ref.invalidate(
-																	mantenimientoNotificacionesProvider,
-																);
+																ref
+																		.read(
+																			mantenimientoNotificacionesProvider.notifier,
+																		)
+																		.refresh(silent: true);
 															},
 														),
 													],

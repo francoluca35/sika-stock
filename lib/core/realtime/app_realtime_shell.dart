@@ -15,7 +15,7 @@ import "../../features/supervisor/domain/maintenance_order.dart";
 import "../../features/supervisor/domain/maintenance_order_notification_row.dart";
 import "app_realtime_sync_provider.dart";
 
-/// Envuelve la app: Realtime para futures + streams Supabase; sin polling periódico.
+/// Envuelve la app: un canal Realtime opcional + avisos. Sin polling periódico.
 class AppRealtimeShell extends ConsumerWidget {
   const AppRealtimeShell({super.key, required this.child});
 

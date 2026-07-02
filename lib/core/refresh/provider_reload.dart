@@ -1,3 +1,5 @@
+import "dart:async";
+
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../features/compras/application/compras_in_app_notifications_provider.dart";
@@ -12,26 +14,21 @@ import "../../features/stock/application/supervisor_stock_catalog_provider.dart"
 import "../../features/supervisor/application/maintenance_orders_provider.dart";
 import "../../features/supervisor/application/supervisor_maintenance_history_provider.dart";
 
-/// Recarga inmediata de providers con keepAlive (invalidate + read / notifier.refresh).
+/// Recarga de providers (botón ⟳ o evento Realtime). Sin polling automático.
 abstract final class ProviderReload {
-	/// Streams Supabase de pedidos y avisos de mantenimiento.
-	static void maintenanceStreams(ProviderContainer container) {
-		container.invalidate(maintenanceOrdersProvider);
-		container.read(maintenanceOrdersProvider);
-		container.invalidate(panolForwardedOrdersProvider);
-		container.read(panolForwardedOrdersProvider);
-		container.invalidate(misPedidosMantenimientoProvider);
-		container.read(misPedidosMantenimientoProvider);
-		container.invalidate(mantenimientoNotificacionesProvider);
-		container.read(mantenimientoNotificacionesProvider);
+	static void maintenanceStreams(ProviderContainer container, {bool silent = false}) {
+		unawaited(container.read(maintenanceOrdersProvider.notifier).refresh(silent: silent));
+		unawaited(container.read(panolForwardedOrdersProvider.notifier).refresh(silent: silent));
+		unawaited(container.read(misPedidosMantenimientoProvider.notifier).refresh(silent: silent));
+		unawaited(container.read(mantenimientoNotificacionesProvider.notifier).refresh(silent: silent));
 	}
 
-	static void comprasNotificationStream(ProviderContainer container) {
-		container.invalidate(comprasInAppNotificationsProvider);
-		container.read(comprasInAppNotificationsProvider);
+	static void comprasNotificationStream(ProviderContainer container, {bool silent = false}) {
+		unawaited(
+			container.read(comprasInAppNotificationsProvider.notifier).refresh(silent: silent),
+		);
 	}
 
-	/// Listados que no usan `.stream()` (historial, seguimiento, solicitudes).
 	static void maintenanceFutures(ProviderContainer container) {
 		container.invalidate(supervisorMaintenanceHistoryProvider);
 		container.read(supervisorMaintenanceHistoryProvider);
@@ -57,9 +54,6 @@ abstract final class ProviderReload {
 		container.read(stockCategoriesProvider.notifier).refresh();
 	}
 
-	/// Cambios en `maintenance_orders` o `compras_panol_stock_requests`.
-	/// Los listados con `.stream()` se actualizan solos vía Realtime de Supabase;
-	/// acá solo recargamos futures (historial, seguimiento, solicitudes).
 	static void onMaintenanceTablesChange(ProviderContainer container) {
 		maintenanceFutures(container);
 	}

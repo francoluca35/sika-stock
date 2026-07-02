@@ -7,6 +7,9 @@ abstract final class SupabaseBootstrap {
 		await Supabase.initialize(
 			url: Env.supabaseUrl,
 			anonKey: Env.supabaseAnonKey,
+			realtimeClientOptions: const RealtimeClientOptions(
+				logLevel: RealtimeLogLevel.error,
+			),
 		);
 	}
 }

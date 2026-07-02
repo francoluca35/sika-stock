@@ -2,15 +2,13 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/compras/application/compras_panol_stock_requests_provider.dart";
-import "../../features/orders/application/mantenimiento_notificaciones_provider.dart";
-import "../../features/orders/application/mis_pedidos_mantenimiento_provider.dart";
 import "../../features/panol/application/panol_order_history_provider.dart";
 import "../../features/panol/application/panol_seguimiento_compras_provider.dart";
 import "../../features/stock/application/stock_categories_provider.dart";
 import "../../features/supervisor/application/supervisor_maintenance_history_provider.dart";
 import "provider_reload.dart";
 
-/// Recarga manual (botón ⟳). Complementa Realtime en [app_realtime_sync_provider].
+/// Recarga manual (botón ⟳). Complementa Realtime opcional en [app_realtime_sync_provider].
 abstract final class ScreenRefresh {
 	static ProviderContainer _c(WidgetRef ref) =>
 			ProviderScope.containerOf(ref.context);
@@ -55,16 +53,12 @@ abstract final class ScreenRefresh {
 		final c = _c(ref);
 		ProviderReload.maintenanceFutures(c);
 		ProviderReload.comprasNotificationStream(c);
-		c.invalidate(mantenimientoNotificacionesProvider);
-		c.read(mantenimientoNotificacionesProvider);
+		ProviderReload.maintenanceStreams(c);
 	}
 
 	static void misPedidos(WidgetRef ref) {
 		final c = _c(ref);
-		c.invalidate(misPedidosMantenimientoProvider);
-		c.read(misPedidosMantenimientoProvider);
-		c.invalidate(mantenimientoNotificacionesProvider);
-		c.read(mantenimientoNotificacionesProvider);
+		ProviderReload.maintenanceStreams(c);
 	}
 
 	static void supervisorHome(WidgetRef ref) {

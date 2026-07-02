@@ -1,5 +1,4 @@
 import "dart:async";
-import "dart:math" as math;
 
 import "package:flutter/foundation.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
@@ -7,32 +6,43 @@ import "package:supabase_flutter/supabase_flutter.dart";
 
 import "../../features/auth/application/auth_providers.dart";
 import "../../features/auth/application/auth_session_provider.dart";
+import "../../features/compras/application/compras_in_app_notifications_provider.dart";
+import "../../features/orders/application/mantenimiento_notificaciones_provider.dart";
+import "../../features/orders/application/mis_pedidos_mantenimiento_provider.dart";
+import "../../features/panol/application/panol_forwarded_orders_provider.dart";
+import "../../features/supervisor/application/maintenance_orders_provider.dart";
 import "../refresh/provider_reload.dart";
 
-/// Suscripción Realtime global: refresca solo providers que no usan `.stream()`.
+/// `true` si el único canal Realtime está activo en esta sesión.
 final appRealtimeSyncProvider =
-		NotifierProvider<AppRealtimeSyncNotifier, int>(AppRealtimeSyncNotifier.new);
+		NotifierProvider<AppRealtimeSyncNotifier, bool>(AppRealtimeSyncNotifier.new);
 
-class AppRealtimeSyncNotifier extends Notifier<int> {
+/// Un solo canal WebSocket. Si falla, se desactiva sin reintentos (evita polling/reload).
+class AppRealtimeSyncNotifier extends Notifier<bool> {
 	RealtimeChannel? _channel;
 	Timer? _maintenanceDebounce;
 	Timer? _stockDebounce;
-	Timer? _reconnectDebounce;
-	int _reconnectAttempts = 0;
+	bool _disabled = false;
+	bool _connecting = false;
 
-	static const _debounceMs = 120;
-	static const _maxReconnectDelaySec = 60;
+	static const _debounceMs = 300;
 
-	void _runIfMounted(void Function(ProviderContainer container) action) {
-		if (!ref.mounted) return;
-		action(ref.container);
+	void _silentRefreshAll() {
+		if (!ref.mounted || _disabled) return;
+		final c = ref.container;
+		unawaited(c.read(maintenanceOrdersProvider.notifier).refresh(silent: true));
+		unawaited(c.read(panolForwardedOrdersProvider.notifier).refresh(silent: true));
+		unawaited(c.read(misPedidosMantenimientoProvider.notifier).refresh(silent: true));
+		unawaited(c.read(mantenimientoNotificacionesProvider.notifier).refresh(silent: true));
+		unawaited(c.read(comprasInAppNotificationsProvider.notifier).refresh(silent: true));
+		ProviderReload.onMaintenanceTablesChange(c);
 	}
 
 	void _scheduleMaintenanceReload() {
 		_maintenanceDebounce?.cancel();
 		_maintenanceDebounce = Timer(
 			const Duration(milliseconds: _debounceMs),
-			() => _runIfMounted(ProviderReload.onMaintenanceTablesChange),
+			_silentRefreshAll,
 		);
 	}
 
@@ -40,7 +50,10 @@ class AppRealtimeSyncNotifier extends Notifier<int> {
 		_stockDebounce?.cancel();
 		_stockDebounce = Timer(
 			const Duration(milliseconds: _debounceMs),
-			() => _runIfMounted(ProviderReload.onStockTablesChange),
+			() {
+				if (!ref.mounted || _disabled) return;
+				ProviderReload.onStockTablesChange(ref.container);
+			},
 		);
 	}
 
@@ -49,52 +62,33 @@ class AppRealtimeSyncNotifier extends Notifier<int> {
 		_maintenanceDebounce = null;
 		_stockDebounce?.cancel();
 		_stockDebounce = null;
-		_reconnectDebounce?.cancel();
-		_reconnectDebounce = null;
-	}
-
-	void _scheduleReconnect() {
-		if (!ref.mounted || _channel == null) return;
-		_reconnectDebounce?.cancel();
-		final delaySec = math.min(
-			_maxReconnectDelaySec,
-			math.pow(2, _reconnectAttempts).toInt(),
-		);
-		_reconnectAttempts++;
-		_reconnectDebounce = Timer(Duration(seconds: delaySec), () {
-			if (!ref.mounted) return;
-			final client = ref.read(supabaseClientProvider);
-			final ch = _channel;
-			if (ch != null) {
-				unawaited(ch.unsubscribe());
-			}
-			_channel = null;
-			if (kDebugMode) {
-				debugPrint("[realtime] reintento de suscripción en ${delaySec}s");
-			}
-			_subscribe(client);
-		});
 	}
 
 	@override
-	int build() {
+	bool build() {
 		ref.keepAlive();
 		final session = ref.watch(authSessionProvider);
 		if (session == null) {
 			_teardown();
-			return 0;
+			_disabled = false;
+			_connecting = false;
+			return false;
 		}
-		final client = ref.watch(supabaseClientProvider);
-		_teardown();
-		_subscribe(client);
+		if (!_disabled && !_connecting && _channel == null) {
+			_connecting = true;
+			_trySubscribe(ref.read(supabaseClientProvider));
+		}
 		ref.onDispose(_teardown);
-		return 0;
+		return _channel != null && !_disabled;
 	}
 
-	void _subscribe(SupabaseClient client) {
+	void _trySubscribe(SupabaseClient client) {
+		if (_disabled) {
+			_connecting = false;
+			return;
+		}
 		final uid = client.auth.currentUser?.id ?? "anon";
-		_reconnectAttempts = 0;
-		_channel = client.channel("app-realtime-sync-$uid");
+		_channel = client.channel("app-live-sync-$uid");
 		_channel!
 				.onPostgresChanges(
 					event: PostgresChangeEvent.all,
@@ -111,6 +105,18 @@ class AppRealtimeSyncNotifier extends Notifier<int> {
 				.onPostgresChanges(
 					event: PostgresChangeEvent.all,
 					schema: "public",
+					table: "maintenance_order_notifications",
+					callback: (_) => _scheduleMaintenanceReload(),
+				)
+				.onPostgresChanges(
+					event: PostgresChangeEvent.all,
+					schema: "public",
+					table: "compras_in_app_notifications",
+					callback: (_) => _scheduleMaintenanceReload(),
+				)
+				.onPostgresChanges(
+					event: PostgresChangeEvent.all,
+					schema: "public",
 					table: "stock_items",
 					callback: (_) => _scheduleStockReload(),
 				)
@@ -121,23 +127,26 @@ class AppRealtimeSyncNotifier extends Notifier<int> {
 					callback: (_) => _scheduleStockReload(),
 				)
 				.subscribe((status, [error]) {
+					_connecting = false;
 					if (status == RealtimeSubscribeStatus.subscribed) {
-						_reconnectAttempts = 0;
-						_reconnectDebounce?.cancel();
-						_reconnectDebounce = null;
+						if (kDebugMode) {
+							debugPrint("[live-sync] WebSocket conectado");
+						}
+						state = true;
 						return;
 					}
 					if (kDebugMode) {
-						debugPrint(
-							"[realtime] canal sync: $status ${error ?? ""}",
-						);
+						debugPrint("[live-sync] WebSocket no disponible: $status ${error ?? ""}");
 					}
-					if (status == RealtimeSubscribeStatus.channelError ||
-							status == RealtimeSubscribeStatus.timedOut ||
-							status == RealtimeSubscribeStatus.closed) {
-						_scheduleReconnect();
-					}
+					_disableRealtime();
 				});
+	}
+
+	void _disableRealtime() {
+		if (_disabled) return;
+		_disabled = true;
+		_teardown();
+		state = false;
 	}
 
 	void _teardown() {

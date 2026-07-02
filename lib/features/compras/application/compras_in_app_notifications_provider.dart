@@ -1,31 +1,34 @@
 import "package:flutter_riverpod/flutter_riverpod.dart";
 
-import "../../auth/application/auth_providers.dart";
 import "../../auth/application/auth_session_provider.dart";
 import "../domain/compras_in_app_notification_row.dart";
+import "compras_stock_repository_provider.dart";
 
-/// Notificaciones in-app de Compras (stream Realtime).
+/// Notificaciones in-app de Compras (HTTP; actualización manual o Realtime global).
 final comprasInAppNotificationsProvider =
-		StreamProvider<List<ComprasInAppNotificationRow>>((ref) {
-	ref.keepAlive();
-	final session = ref.watch(authSessionProvider);
-	if (session == null) {
-		return Stream.value(const []);
+		AsyncNotifierProvider<ComprasInAppNotificationsNotifier,
+				List<ComprasInAppNotificationRow>>(
+	ComprasInAppNotificationsNotifier.new,
+);
+
+class ComprasInAppNotificationsNotifier
+		extends AsyncNotifier<List<ComprasInAppNotificationRow>> {
+	@override
+	Future<List<ComprasInAppNotificationRow>> build() async {
+		ref.keepAlive();
+		final session = ref.watch(authSessionProvider);
+		if (session == null) return const [];
+		return ref.read(comprasStockRepositoryProvider).fetchMyNotifications();
 	}
-	final uid = session.user.id;
-	final client = ref.watch(supabaseClientProvider);
-	return client
-			.from("compras_in_app_notifications")
-			.stream(primaryKey: ["id"])
-			.eq("user_id", uid)
-			.order("created_at", ascending: false)
-			.map(
-				(rows) => rows
-						.map(
-							(m) => ComprasInAppNotificationRow.fromJson(
-								Map<String, dynamic>.from(m),
-							),
-						)
-						.toList(),
-			);
-});
+
+	Future<void> refresh({bool silent = false}) async {
+		if (!silent) {
+			state = const AsyncValue.loading();
+		}
+		state = await AsyncValue.guard(() async {
+			final session = ref.read(authSessionProvider);
+			if (session == null) return const <ComprasInAppNotificationRow>[];
+			return ref.read(comprasStockRepositoryProvider).fetchMyNotifications();
+		});
+	}
+}
