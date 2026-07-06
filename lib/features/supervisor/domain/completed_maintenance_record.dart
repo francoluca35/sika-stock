@@ -25,7 +25,9 @@ class CompletedMaintenanceRecord {
 			MaintenanceWorkflowStatus.comprasOcNotified => "Pedido a compras",
 			MaintenanceWorkflowStatus.comprasPurchaseDone => "Pedido a compras",
 			MaintenanceWorkflowStatus.comprasArrivedNotified => "Listo para retirar",
-			MaintenanceWorkflowStatus.cancelled => "Cancelado",
+			MaintenanceWorkflowStatus.cancelled => o.cancellationObservacion.trim().isNotEmpty
+					? "Cancelado · ${o.cancellationObservacion.trim()}"
+					: "Cancelado",
 			_ => "Cerrado",
 		};
 		final fecha = o.updatedAt ?? o.fechaPedido;

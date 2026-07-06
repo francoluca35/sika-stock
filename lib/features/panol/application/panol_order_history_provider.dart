@@ -3,7 +3,7 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 import "../../supervisor/application/maintenance_orders_provider.dart";
 import "../../supervisor/domain/completed_maintenance_record.dart";
 
-/// Historial de pedidos vistos por pañol (completados / cancelados).
+/// Historial de pedidos vistos por pañol (en curso, entregados y cancelados).
 final panolOrderHistoryProvider =
 		FutureProvider<List<CompletedMaintenanceRecord>>((ref) async {
 	ref.keepAlive();

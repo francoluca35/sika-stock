@@ -244,6 +244,7 @@ class _NotificationCard extends ConsumerWidget {
 			"compra_realizada" => Colors.deepOrange.shade900,
 			"oc_emitida_compras" => Colors.indigo.shade900,
 			"material_llego_planta" => const Color(0xFF1B5E20),
+			"pedido_anulado" => Colors.red.shade900,
 			_ => Colors.orange.shade900,
 		};
 	}

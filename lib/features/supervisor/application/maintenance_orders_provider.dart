@@ -117,6 +117,17 @@ class MaintenanceOrdersNotifier extends AsyncNotifier<List<MaintenanceOrder>> {
 		await _afterWorkflowChange();
 	}
 
+	Future<void> cancelOrder({
+		required String orderId,
+		required String observacion,
+	}) async {
+		await ref.read(maintenanceOrdersRepositoryProvider).cancelOrder(
+					orderId: orderId,
+					observacion: observacion,
+				);
+		await _afterWorkflowChange();
+	}
+
 	Future<void> _afterWorkflowChange() async {
 		await refresh(silent: true);
 		ref.invalidate(supervisorMaintenanceHistoryProvider);

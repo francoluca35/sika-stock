@@ -10,8 +10,8 @@ import "../application/mis_pedidos_mantenimiento_provider.dart";
 import "widgets/maintenance_order_seguimiento_sheet.dart";
 import "widgets/maintenance_order_timeline.dart";
 
-String _estadoMantenimientoTexto(MaintenanceWorkflowStatus w) {
-	switch (w) {
+String _estadoMantenimientoTexto(MaintenanceOrder order) {
+	switch (order.workflowStatus) {
 		case MaintenanceWorkflowStatus.pendingSupervisor:
 			return "Enviado — esperando supervisor";
 		case MaintenanceWorkflowStatus.supervisorStockOk:
@@ -28,7 +28,8 @@ String _estadoMantenimientoTexto(MaintenanceWorkflowStatus w) {
 		case MaintenanceWorkflowStatus.completed:
 			return "Completado";
 		case MaintenanceWorkflowStatus.cancelled:
-			return "Cancelado";
+			final motivo = order.cancellationObservacion.trim();
+			return motivo.isNotEmpty ? "Cancelado · $motivo" : "Cancelado";
 	}
 }
 
@@ -131,7 +132,7 @@ class MyMaintenanceOrdersScreen extends ConsumerWidget {
 																	),
 																	const SizedBox(height: 6),
 																	Text(
-																		_estadoMantenimientoTexto(o.workflowStatus),
+																		_estadoMantenimientoTexto(o),
 																		style: TextStyle(
 																			fontSize: 13,
 																			color: Colors.grey.shade800,

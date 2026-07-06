@@ -61,6 +61,7 @@ List<MaintenanceTimelineStep> buildMaintenanceTimelineSteps(MaintenanceOrder ord
 			: null;
 
 	if (order.workflowStatus == MaintenanceWorkflowStatus.cancelled) {
+		final motivo = order.cancellationObservacion.trim();
 		return [
 			MaintenanceTimelineStep(
 				label: "Pedido registrado",
@@ -70,9 +71,13 @@ List<MaintenanceTimelineStep> buildMaintenanceTimelineSteps(MaintenanceOrder ord
 			),
 			MaintenanceTimelineStep(
 				label: "Cancelado",
-				subtitle: "El pedido fue cancelado en el sistema.",
+				subtitle: motivo.isNotEmpty
+						? "Motivo: $motivo"
+						: "El pedido fue cancelado en el sistema.",
 				state: MaintenanceTimelineStepState.cancelled,
-				timestamp: actualizado,
+				timestamp: order.cancelledAt != null
+						? ArgentinaDateTime.formatDateTime(order.cancelledAt!)
+						: actualizado,
 			),
 		];
 	}

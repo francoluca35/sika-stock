@@ -82,10 +82,12 @@ class MaintenanceOrder {
 		required this.priority,
 		required this.destination,
 		this.observacion = "",
+		this.cancellationObservacion = "",
 		this.imagenUrl,
 		this.updatedAt,
 		this.createdBy,
 		this.stockItemId,
+		this.cancelledAt,
 	});
 
 	final String id;
@@ -108,6 +110,9 @@ class MaintenanceOrder {
 	/// Comentario libre del solicitante (qué necesita / para qué).
 	final String observacion;
 
+	/// Motivo de anulación (supervisor / pañol / admin).
+	final String cancellationObservacion;
+
 	final String? imagenUrl;
 
 	/// Última actualización en BD (útil para ordenar historial).
@@ -118,6 +123,13 @@ class MaintenanceOrder {
 
 	/// Línea de inventario descontada al confirmar retiro con stock (`stock_item_id` en BD).
 	final String? stockItemId;
+
+	final DateTime? cancelledAt;
+
+	/// Pedidos activos que pueden anularse (no completados ni ya cancelados).
+	bool get puedeAnular =>
+			workflowStatus != MaintenanceWorkflowStatus.completed &&
+			workflowStatus != MaintenanceWorkflowStatus.cancelled;
 
 	/// Badge genérico según flujo.
 	MaintenanceOrderStatus get estado {
@@ -169,11 +181,22 @@ class MaintenanceOrder {
 			priority: m["priority"] as String,
 			destination: m["destination"] as String,
 			observacion: (m["observacion"] as String?)?.trim() ?? "",
+			cancellationObservacion:
+					(m["cancellation_observacion"] as String?)?.trim() ?? "",
 			imagenUrl: m["imagen_url"] as String?,
 			updatedAt: updatedAt,
 			createdBy: m["created_by"]?.toString(),
 			stockItemId: m["stock_item_id"]?.toString(),
+			cancelledAt: _parseOptionalDate(m["cancelled_at"]),
 		);
+	}
+
+	static DateTime? _parseOptionalDate(dynamic raw) {
+		if (raw == null) return null;
+		return switch (raw) {
+			DateTime d => d.toUtc(),
+			_ => DateTime.tryParse(raw.toString())?.toUtc(),
+		};
 	}
 
 	static String _composeMotivo(Map<String, dynamic> m) {
@@ -203,10 +226,12 @@ class MaintenanceOrder {
 			priority: priority,
 			destination: destination,
 			observacion: observacion,
+			cancellationObservacion: cancellationObservacion,
 			imagenUrl: imagenUrl,
 			updatedAt: updatedAt ?? this.updatedAt,
 			createdBy: createdBy ?? this.createdBy,
 			stockItemId: stockItemId ?? this.stockItemId,
+			cancelledAt: cancelledAt,
 		);
 	}
 }
