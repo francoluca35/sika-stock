@@ -17,6 +17,7 @@ class MaintenanceOrdersRepository {
 	static const _selectListCols =
 			"id, order_number, created_at, updated_at, created_by, solicitante_display, "
 			"product_name, quantity, product_type, priority, destination, observacion, "
+			"cancellation_observacion, cancelled_at, "
 			"workflow_status, stock_item_id";
 
 	static const _selectDetailCols = "$_selectListCols, imagen_url";
@@ -222,12 +223,21 @@ class MaintenanceOrdersRepository {
 		return _mapList(rows);
 	}
 
-	/// Historial pañol: pedidos cerrados o cancelados que pasaron por su circuito.
+	/// Historial pañol: pedidos cerrados, cancelados o aún en circuito pañol/compras.
 	Future<List<MaintenanceOrder>> fetchPanolOrderHistory() async {
 		final rows = await _client
 				.from("maintenance_orders")
 				.select(_selectListCols)
-				.inFilter("workflow_status", ["completed", "cancelled"])
+				.inFilter("workflow_status", [
+					"forwarded_to_panol",
+					"panol_requested_compras",
+					"compras_oc_notified",
+					"compras_purchase_done",
+					"compras_arrived_notified",
+					"supervisor_stock_ok",
+					"completed",
+					"cancelled",
+				])
 				.order("updated_at", ascending: false)
 				.limit(_limitHistory);
 		return _mapList(rows);
@@ -298,6 +308,26 @@ class MaintenanceOrdersRepository {
 	}
 
 	/// Pañol: registra cantidad en inventario y marca pedido listo para retiro.
+	Future<void> cancelOrder({
+		required String orderId,
+		required String observacion,
+	}) async {
+		if (_client.auth.currentUser?.id == null) {
+			throw Exception("No hay sesión");
+		}
+		final obs = observacion.trim();
+		if (obs.isEmpty) {
+			throw Exception("Ingresá el motivo de anulación.");
+		}
+		await _client.rpc<void>(
+			"cancel_maintenance_order",
+			params: <String, dynamic>{
+				"p_order_id": orderId,
+				"p_observacion": obs,
+			},
+		);
+	}
+
 	Future<void> panolConfirmCatalogStock({
 		required String orderId,
 		required String stockItemId,

@@ -2,16 +2,35 @@ import "package:flutter/material.dart";
 
 import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
+import "../../../supervisor/data/maintenance_orders_repository.dart";
 import "../../../supervisor/domain/maintenance_order.dart";
 import "maintenance_order_timeline.dart";
 import "maintenance_order_photo_dialog.dart";
 
 /// Modal con el detalle completo de un pedido de mantenimiento.
-void showMaintenanceOrderDetalleDialog(
+Future<void> showMaintenanceOrderDetalleDialog(
 	BuildContext context,
 	MaintenanceOrder order, {
 	int? stockCatalogoCantidad,
-}) {
+	required MaintenanceOrdersRepository repository,
+}) async {
+	var detail = order;
+	String? photoUrl;
+	try {
+		final fresh = await repository.fetchOrderById(order.id);
+		if (fresh != null) {
+			detail = fresh;
+		}
+		photoUrl = await repository.resolveOrderPhotoUrl(detail);
+	} catch (_) {
+		photoUrl = detail.imagenUrl?.trim();
+		if (photoUrl != null && photoUrl.isEmpty) {
+			photoUrl = null;
+		}
+	}
+
+	if (!context.mounted) return;
+
 	showDialog<void>(
 		context: context,
 		builder: (ctx) => AlertDialog(
@@ -22,7 +41,7 @@ void showMaintenanceOrderDetalleDialog(
 					mainAxisSize: MainAxisSize.min,
 					children: [
 						Text(
-							order.numeroOrden,
+							detail.numeroOrden,
 							style: const TextStyle(
 								fontWeight: FontWeight.w800,
 								fontSize: 16,
@@ -32,17 +51,25 @@ void showMaintenanceOrderDetalleDialog(
 						const SizedBox(height: 14),
 						_DetalleFila(
 							label: "Fecha",
-							valor: ArgentinaDateTime.formatDateTime(order.fechaPedido),
+							valor: ArgentinaDateTime.formatDateTime(detail.fechaPedido),
 						),
-						_DetalleFila(label: "Producto", valor: order.producto),
-						_DetalleFila(label: "Cantidad", valor: "${order.quantity} u."),
-						_DetalleFila(label: "Tipo", valor: order.productType),
-						_DetalleFila(label: "Prioridad", valor: order.priority),
-						_DetalleFila(label: "Destino", valor: order.destination),
-						if (order.observacion.trim().isNotEmpty)
-							_DetalleFila(label: "Observación", valor: order.observacion),
-						_DetalleFila(label: "Solicitante", valor: order.solicitante),
-						_DetalleFila(label: "Estado", valor: _workflowLabel(order.workflowStatus)),
+						_DetalleFila(label: "Producto", valor: detail.producto),
+						_DetalleFila(label: "Cantidad", valor: "${detail.quantity} u."),
+						_DetalleFila(label: "Tipo", valor: detail.productType),
+						_DetalleFila(label: "Prioridad", valor: detail.priority),
+						_DetalleFila(label: "Destino", valor: detail.destination),
+						if (detail.observacion.trim().isNotEmpty)
+							_DetalleFila(label: "Observación", valor: detail.observacion),
+						if (detail.cancellationObservacion.trim().isNotEmpty)
+							_DetalleFila(
+								label: "Motivo de anulación",
+								valor: detail.cancellationObservacion,
+							),
+						_DetalleFila(label: "Solicitante", valor: detail.solicitante),
+						_DetalleFila(
+							label: "Estado",
+							valor: _workflowLabel(detail.workflowStatus),
+						),
 						const SizedBox(height: 12),
 						const Text(
 							"Línea de tiempo",
@@ -52,7 +79,7 @@ void showMaintenanceOrderDetalleDialog(
 							),
 						),
 						const SizedBox(height: 8),
-						MaintenanceOrderTimeline(order: order, compact: true),
+						MaintenanceOrderTimeline(order: detail, compact: true),
 						if (stockCatalogoCantidad != null)
 							_DetalleFila(
 								label: "Stock en catálogo (aprox.)",
@@ -60,8 +87,8 @@ void showMaintenanceOrderDetalleDialog(
 										? "$stockCatalogoCantidad u. disponibles"
 										: "Sin coincidencia en inventario digital",
 							),
-						_DetalleFila(label: "Resumen", valor: order.motivo),
-						if (order.imagenUrl != null && order.imagenUrl!.trim().isNotEmpty) ...[
+						_DetalleFila(label: "Resumen", valor: detail.motivo),
+						if (photoUrl != null && photoUrl.isNotEmpty) ...[
 							const SizedBox(height: 4),
 							Text(
 								"Imagen adjunta",
@@ -76,9 +103,24 @@ void showMaintenanceOrderDetalleDialog(
 							ClipRRect(
 								borderRadius: BorderRadius.circular(AppTokens.radiusMd),
 								child: MaintenanceOrderPhotoView(
-									imageUrl: order.imagenUrl!,
+									imageUrl: photoUrl,
 									height: 140,
 									fit: BoxFit.cover,
+								),
+							),
+							const SizedBox(height: 8),
+							OutlinedButton.icon(
+								onPressed: () {
+									showMaintenanceOrderPhotoDialog(
+										ctx,
+										photoUrl!,
+										title: "Foto del pedido · ${detail.numeroOrden}",
+									);
+								},
+								icon: const Icon(Icons.image_outlined, size: 20),
+								label: const Text(
+									"VER IMAGEN",
+									style: TextStyle(fontWeight: FontWeight.w700),
 								),
 							),
 						],

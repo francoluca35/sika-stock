@@ -3,6 +3,8 @@ import "package:flutter_riverpod/flutter_riverpod.dart";
 
 import "../../../auth/application/auth_providers.dart";
 import "../../../supervisor/domain/maintenance_order.dart";
+import "../../../auth/domain/app_role.dart";
+import "cancel_maintenance_order_dialog.dart";
 import "maintenance_order_timeline.dart";
 import "order_notification_actions.dart";
 import "retiro_producto_detail_sheet.dart";
@@ -123,6 +125,51 @@ class _SeguimientoSheetBody extends ConsumerWidget {
 											),
 										),
 									),
+						],
+						if (appRolePuedeAnularPedidoMantenimiento(role) && order.puedeAnular) ...[
+							const SizedBox(height: 4),
+							OutlinedButton.icon(
+								onPressed: () async {
+									Navigator.pop(sheetContext);
+									await handleCancelMaintenanceOrderForRole(
+										context: context,
+										ref: effectiveRef,
+										role: role,
+										order: order,
+									);
+								},
+								icon: Icon(Icons.cancel_outlined, color: Colors.red.shade800),
+								label: Text(
+									"Anular pedido",
+									style: TextStyle(
+										fontWeight: FontWeight.w700,
+										color: Colors.red.shade800,
+									),
+								),
+								style: OutlinedButton.styleFrom(
+									side: BorderSide(color: Colors.red.shade800, width: 1.2),
+									padding: const EdgeInsets.symmetric(vertical: 12),
+								),
+							),
+						],
+						if (order.cancellationObservacion.trim().isNotEmpty) ...[
+							const SizedBox(height: 10),
+							Container(
+								padding: const EdgeInsets.all(10),
+								decoration: BoxDecoration(
+									color: Colors.red.shade50,
+									borderRadius: BorderRadius.circular(8),
+									border: Border.all(color: Colors.red.shade200),
+								),
+								child: Text(
+									"Motivo de anulación: ${order.cancellationObservacion.trim()}",
+									style: TextStyle(
+										fontSize: 13,
+										height: 1.35,
+										color: Colors.red.shade900,
+									),
+								),
+							),
 						],
 						const SizedBox(height: 8),
 						OutlinedButton(

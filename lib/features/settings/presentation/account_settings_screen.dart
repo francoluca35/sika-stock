@@ -2,8 +2,13 @@ import "package:flutter/material.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:go_router/go_router.dart";
 
+import "../../../core/notifications/desktop_notification_preferences.dart";
+import "../../../core/notifications/web_notification_service.dart";
+import "../../../core/pwa/pwa_install_banner.dart";
+import "../../../core/pwa/pwa_install_preferences.dart";
 import "../../../core/theme/app_tokens.dart";
 import "../../auth/application/auth_providers.dart";
+import "../../auth/application/auth_session_provider.dart";
 import "../../auth/domain/profile_row.dart";
 import "../../auth/presentation/widgets/auth_field_styles.dart";
 import "../../auth/presentation/widgets/auth_password_field.dart";
@@ -31,6 +36,64 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
 	bool _fieldsLoaded = false;
 	bool _savingProfile = false;
 	bool _savingPassword = false;
+	bool _loadingNotifications = true;
+	bool _notificationsEnabled = false;
+
+	@override
+	void initState() {
+		super.initState();
+		WidgetsBinding.instance.addPostFrameCallback((_) => _loadNotificationPreference());
+	}
+
+	Future<void> _loadNotificationPreference() async {
+		final session = ref.read(authSessionProvider);
+		if (session == null) {
+			if (mounted) setState(() => _loadingNotifications = false);
+			return;
+		}
+		final enabled = await DesktopNotificationPreferences.isEnabled(session.user.id);
+		if (!mounted) return;
+		setState(() {
+			_notificationsEnabled = enabled;
+			_loadingNotifications = false;
+		});
+	}
+
+	Future<void> _toggleNotifications() async {
+		final session = ref.read(authSessionProvider);
+		if (session == null) return;
+
+		final userId = session.user.id;
+		final activar = !_notificationsEnabled;
+
+		if (activar && WebNotificationService.supported && !WebNotificationService.isGranted) {
+			final permission = await WebNotificationService.requestPermission();
+			if (permission == "denied" && mounted) {
+				ScaffoldMessenger.of(context).showSnackBar(
+					const SnackBar(
+						content: Text(
+							"El navegador bloqueó las notificaciones de escritorio. "
+							"Igual verás avisos dentro de la app.",
+						),
+					),
+				);
+			}
+		}
+
+		await DesktopNotificationPreferences.setPrompted(userId);
+		await DesktopNotificationPreferences.setEnabled(userId, activar);
+		if (!mounted) return;
+		setState(() => _notificationsEnabled = activar);
+		ScaffoldMessenger.of(context).showSnackBar(
+			SnackBar(
+				content: Text(
+					activar
+							? "Notificaciones activadas."
+							: "Notificaciones desactivadas.",
+				),
+			),
+		);
+	}
 
 	@override
 	void dispose() {
@@ -287,6 +350,115 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
 		);
 	}
 
+	Widget _buildNotificationsSection() {
+		return Column(
+			crossAxisAlignment: CrossAxisAlignment.stretch,
+			children: [
+				const Text(
+					"AVISOS",
+					style: TextStyle(
+						fontWeight: FontWeight.bold,
+						fontSize: 13,
+						letterSpacing: 0.4,
+					),
+				),
+				const SizedBox(height: 12),
+				Text(
+					"Recibí un aviso en la esquina de la pantalla cuando alguien "
+					"haga un pedido o haya novedades en el flujo.",
+					style: TextStyle(fontSize: 13, height: 1.35, color: Colors.grey.shade700),
+				),
+				const SizedBox(height: 16),
+				SizedBox(
+					height: 52,
+					child: FilledButton.icon(
+						style: FilledButton.styleFrom(
+							backgroundColor:
+									_notificationsEnabled ? Colors.grey.shade700 : AppTokens.blackNav,
+							foregroundColor: Colors.white,
+							shape: RoundedRectangleBorder(
+								borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+							),
+						),
+						onPressed: _loadingNotifications ? null : _toggleNotifications,
+						icon: _loadingNotifications
+								? const SizedBox(
+										width: 22,
+										height: 22,
+										child: CircularProgressIndicator(
+											strokeWidth: 2,
+											color: Colors.white,
+										),
+									)
+								: Icon(
+										_notificationsEnabled
+												? Icons.notifications_off_outlined
+												: Icons.notifications_active_outlined,
+									),
+						label: Text(
+							_loadingNotifications
+									? "CARGANDO..."
+									: _notificationsEnabled
+									? "DESACTIVAR NOTIFICACIONES"
+									: "ACTIVAR NOTIFICACIONES",
+							style: const TextStyle(fontWeight: FontWeight.bold),
+						),
+					),
+				),
+				if (_notificationsEnabled) ...[
+					const SizedBox(height: 8),
+					Text(
+						"Estado: activadas",
+						style: TextStyle(
+							fontSize: 12,
+							fontWeight: FontWeight.w600,
+							color: Colors.green.shade800,
+						),
+					),
+				],
+			],
+		);
+	}
+
+	Widget _buildAppInstallSection() {
+		return Column(
+			crossAxisAlignment: CrossAxisAlignment.stretch,
+			children: [
+				const Text(
+					"INSTALAR APP",
+					style: TextStyle(
+						fontWeight: FontWeight.bold,
+						fontSize: 13,
+						letterSpacing: 0.4,
+					),
+				),
+				const SizedBox(height: 12),
+				Text(
+					"Instalá Sika Stock en el escritorio o en la pantalla de inicio "
+					"del celular para abrirla como una aplicación.",
+					style: TextStyle(fontSize: 13, height: 1.35, color: Colors.grey.shade700),
+				),
+				const SizedBox(height: 16),
+				const PwaInstallSettingsButton(),
+				const SizedBox(height: 8),
+				TextButton(
+					onPressed: () async {
+						await PwaInstallPreferences.setBannerDismissed(false);
+						if (!mounted) return;
+						ScaffoldMessenger.of(context).showSnackBar(
+							const SnackBar(
+								content: Text(
+									"Al volver al inicio verás de nuevo el cartel de instalación.",
+								),
+							),
+						);
+					},
+					child: const Text("Volver a mostrar cartel de instalación"),
+				),
+			],
+		);
+	}
+
 	Widget _buildPasswordFields() {
 		return Column(
 			crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -413,6 +585,10 @@ class _AccountSettingsScreenState extends ConsumerState<AccountSettingsScreen> {
 								crossAxisAlignment: CrossAxisAlignment.stretch,
 								children: [
 									_buildIntro(profile, isWide: isWide),
+									SizedBox(height: isWide ? 28 : 24),
+									_sectionCard(child: _buildNotificationsSection()),
+									SizedBox(height: isWide ? 20 : 16),
+									_sectionCard(child: _buildAppInstallSection()),
 									SizedBox(height: isWide ? 28 : 24),
 									if (isWide)
 										IntrinsicHeight(

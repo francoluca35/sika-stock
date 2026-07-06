@@ -5,13 +5,16 @@ import "package:go_router/go_router.dart";
 import "../../../core/format/argentina_datetime.dart";
 import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
+import "../../auth/application/auth_providers.dart";
+import "../../orders/presentation/widgets/cancel_maintenance_order_dialog.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../supervisor/domain/completed_maintenance_record.dart";
 import "../../supervisor/domain/maintenance_order.dart";
+import "../application/panol_forwarded_orders_provider.dart";
 import "../application/panol_order_history_provider.dart";
 
-/// Historial de pedidos gestionados por pañol (entregados / cancelados).
+/// Historial de pedidos gestionados por pañol (en curso, entregados y cancelados).
 class PanolPedidosHistorialScreen extends ConsumerStatefulWidget {
 	const PanolPedidosHistorialScreen({super.key});
 
@@ -58,6 +61,23 @@ class _PanolPedidosHistorialScreenState extends ConsumerState<PanolPedidosHistor
 			return true;
 		}).toList()
 			..sort((a, b) => b.fechaCierre.compareTo(a.fechaCierre));
+	}
+
+	Future<void> _anularDesdeHistorial(
+		BuildContext context,
+		MaintenanceOrder order,
+	) async {
+		final role = ref.read(currentProfileProvider).value?.rol;
+		await handleCancelMaintenanceOrderForRole(
+			context: context,
+			ref: ref,
+			role: role,
+			order: order,
+		);
+		if (!mounted) return;
+		ref.invalidate(panolOrderHistoryProvider);
+		ref.invalidate(panolForwardedOrdersProvider);
+		await ref.read(panolOrderHistoryProvider.future);
 	}
 
 	@override
@@ -145,7 +165,12 @@ class _PanolPedidosHistorialScreenState extends ConsumerState<PanolPedidosHistor
 										separatorBuilder: (_, __) => const SizedBox(height: 10),
 										itemBuilder: (context, i) {
 											final r = filtrados[i];
-											return _PanolHistorialCard(record: r);
+											return _PanolHistorialCard(
+												record: r,
+												onAnular: r.pedido.puedeAnular
+														? () => _anularDesdeHistorial(context, r.pedido)
+														: null,
+											);
 										},
 									),
 								);
@@ -159,16 +184,31 @@ class _PanolPedidosHistorialScreenState extends ConsumerState<PanolPedidosHistor
 }
 
 class _PanolHistorialCard extends StatelessWidget {
-	const _PanolHistorialCard({required this.record});
+	const _PanolHistorialCard({
+		required this.record,
+		this.onAnular,
+	});
 
 	final CompletedMaintenanceRecord record;
+	final VoidCallback? onAnular;
 
 	@override
 	Widget build(BuildContext context) {
 		final o = record.pedido;
-		final entregado = o.workflowStatus == MaintenanceWorkflowStatus.completed;
-		final bg = entregado ? const Color(0xFFE8F5E9) : Colors.grey.shade100;
-		final borde = entregado ? const Color(0xFF2E7D32) : Colors.grey.shade600;
+		final ws = o.workflowStatus;
+		final entregado = ws == MaintenanceWorkflowStatus.completed;
+		final cancelado = ws == MaintenanceWorkflowStatus.cancelled;
+		final enCurso = o.puedeAnular;
+		final bg = entregado
+				? const Color(0xFFE8F5E9)
+				: cancelado
+				? Colors.grey.shade100
+				: Colors.orange.shade50;
+		final borde = entregado
+				? const Color(0xFF2E7D32)
+				: cancelado
+				? Colors.grey.shade600
+				: Colors.orange.shade800;
 
 		return Material(
 			color: bg,
@@ -204,6 +244,8 @@ class _PanolHistorialCard extends StatelessWidget {
 										decoration: BoxDecoration(
 											color: entregado
 													? const Color(0xFF2E7D32)
+													: enCurso
+													? Colors.orange.shade800
 													: Colors.grey.shade700,
 											borderRadius: BorderRadius.circular(6),
 										),
@@ -216,6 +258,28 @@ class _PanolHistorialCard extends StatelessWidget {
 											),
 										),
 									),
+									if (onAnular != null) ...[
+										const SizedBox(width: 8),
+										OutlinedButton.icon(
+											onPressed: onAnular,
+											style: OutlinedButton.styleFrom(
+												foregroundColor: Colors.red.shade800,
+												side: BorderSide(color: Colors.red.shade800, width: 1.2),
+												padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+												minimumSize: Size.zero,
+												tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+											),
+											icon: Icon(Icons.cancel_outlined, size: 16, color: Colors.red.shade800),
+											label: Text(
+												"ANULAR",
+												style: TextStyle(
+													fontWeight: FontWeight.w800,
+													fontSize: 10,
+													color: Colors.red.shade800,
+												),
+											),
+										),
+									],
 								],
 							),
 							const SizedBox(height: 8),
@@ -236,6 +300,18 @@ class _PanolHistorialCard extends StatelessWidget {
 									fontWeight: FontWeight.w600,
 								),
 							),
+							if (cancelado && o.cancellationObservacion.trim().isNotEmpty) ...[
+								const SizedBox(height: 6),
+								Text(
+									"Motivo: ${o.cancellationObservacion.trim()}",
+									style: TextStyle(
+										fontSize: 12,
+										height: 1.35,
+										color: Colors.grey.shade800,
+										fontStyle: FontStyle.italic,
+									),
+								),
+							],
 						],
 					),
 				),

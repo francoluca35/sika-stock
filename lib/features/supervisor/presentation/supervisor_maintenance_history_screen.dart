@@ -5,9 +5,11 @@ import "package:go_router/go_router.dart";
 import "../../../core/format/argentina_datetime.dart";
 import "../../../core/refresh/screen_refresh.dart";
 import "../../../core/theme/app_tokens.dart";
+import "../../orders/presentation/widgets/cancel_maintenance_order_dialog.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../orders/presentation/widgets/retiro_producto_detail_sheet.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
+import "../../auth/application/auth_providers.dart";
 import "../application/supervisor_maintenance_history_provider.dart";
 import "../domain/completed_maintenance_record.dart";
 import "../domain/maintenance_order.dart";
@@ -111,6 +113,21 @@ class _SupervisorMaintenanceHistoryScreenState
 	Future<void> _refrescarHistorial() async {
 		ref.invalidate(supervisorMaintenanceHistoryProvider);
 		await ref.read(supervisorMaintenanceHistoryProvider.future);
+	}
+
+	Future<void> _anularDesdeHistorial(
+		BuildContext context,
+		MaintenanceOrder order,
+	) async {
+		final role = ref.read(currentProfileProvider).value?.rol;
+		await handleCancelMaintenanceOrderForRole(
+			context: context,
+			ref: ref,
+			role: role,
+			order: order,
+		);
+		if (!mounted) return;
+		await _refrescarHistorial();
 	}
 
 	@override
@@ -284,6 +301,12 @@ class _SupervisorMaintenanceHistoryScreenState
 																			itemBuilder: (context, index) {
 																				return _HistorialPedidoCard(
 																					record: filtrados[index],
+																					onAnular: filtrados[index].pedido.puedeAnular
+																							? () => _anularDesdeHistorial(
+																										context,
+																										filtrados[index].pedido,
+																									)
+																							: null,
 																				);
 																			},
 																		),
@@ -333,9 +356,13 @@ class _SupervisorMaintenanceHistoryScreenState
 }
 
 class _HistorialPedidoCard extends StatelessWidget {
-	const _HistorialPedidoCard({required this.record});
+	const _HistorialPedidoCard({
+		required this.record,
+		this.onAnular,
+	});
 
 	final CompletedMaintenanceRecord record;
+	final VoidCallback? onAnular;
 
 	static const Color _verdeFondo = Color(0xFFE8F5E9);
 	static const Color _verdeBorde = Color(0xFF2E7D32);
@@ -494,6 +521,28 @@ class _HistorialPedidoCard extends StatelessWidget {
 											),
 										),
 									],
+									if (onAnular != null) ...[
+										const SizedBox(width: 8),
+										OutlinedButton.icon(
+											onPressed: onAnular,
+											style: OutlinedButton.styleFrom(
+												foregroundColor: Colors.red.shade800,
+												side: BorderSide(color: Colors.red.shade800, width: 1.4),
+												padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+												minimumSize: Size.zero,
+												tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+											),
+											icon: Icon(Icons.cancel_outlined, size: 18, color: Colors.red.shade800),
+											label: Text(
+												"ANULAR",
+												style: TextStyle(
+													fontWeight: FontWeight.w800,
+													fontSize: 11,
+													color: Colors.red.shade800,
+												),
+											),
+										),
+									],
 								],
 							),
 							const SizedBox(height: 8),
@@ -530,6 +579,19 @@ class _HistorialPedidoCard extends StatelessWidget {
 									color: tituloColor,
 								),
 							),
+							if (ws == MaintenanceWorkflowStatus.cancelled &&
+									o.cancellationObservacion.trim().isNotEmpty) ...[
+								const SizedBox(height: 8),
+								Text(
+									"Motivo: ${o.cancellationObservacion.trim()}",
+									style: TextStyle(
+										fontSize: 12.5,
+										height: 1.35,
+										color: secundario,
+										fontStyle: FontStyle.italic,
+									),
+								),
+							],
 						],
 					),
 				),

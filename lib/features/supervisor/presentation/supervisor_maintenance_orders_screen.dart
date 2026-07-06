@@ -13,6 +13,7 @@ import "../application/maintenance_orders_provider.dart";
 import "../application/maintenance_stock_similarity.dart"
 		show analizarStockLineaExacta, analizarStockPedido, stockSimilarToPedido;
 import "../../orders/application/order_navigation_target_provider.dart";
+import "../../orders/presentation/widgets/cancel_maintenance_order_dialog.dart";
 import "../domain/maintenance_order.dart";
 
 /// Tabla de **pedidos de mantenimiento** para supervisor (lista mockup).
@@ -225,7 +226,27 @@ class _SupervisorMaintenanceOrdersScreenState
             ),
           ),
         ),
+      if (o.puedeAnular)
+        _TextActionButton(
+          label: "ANULAR",
+          background: Colors.red.shade800,
+          foreground: Colors.white,
+          onPressed: () => _anularPedido(context, o),
+        ),
     ];
+  }
+
+  Future<void> _anularPedido(BuildContext context, MaintenanceOrder o) async {
+    await handleCancelMaintenanceOrder(
+      context: context,
+      ref: ref,
+      order: o,
+      onCancel: ({required orderId, required observacion}) =>
+          ref.read(maintenanceOrdersProvider.notifier).cancelOrder(
+                orderId: orderId,
+                observacion: observacion,
+              ),
+    );
   }
 
   Future<void> _elegirProductoCatalogo(
@@ -685,6 +706,26 @@ class _SupervisorMaintenanceOrdersScreenState
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ],
+                if (order.puedeAnular) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      Navigator.of(ctx).pop();
+                      await _anularPedido(context, order);
+                    },
+                    icon: Icon(Icons.cancel_outlined, size: 20, color: Colors.red.shade800),
+                    label: Text(
+                      "ANULAR PEDIDO",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.red.shade800,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: Colors.red.shade800, width: 1.2),
                     ),
                   ),
                 ],

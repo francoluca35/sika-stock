@@ -12,6 +12,7 @@ import "../../stock/application/supervisor_stock_catalog_provider.dart";
 import "../../stock/domain/stock_product.dart";
 import "../../stock/presentation/widgets/stock_screen_header.dart";
 import "../../orders/application/order_navigation_target_provider.dart";
+import "../../orders/presentation/widgets/cancel_maintenance_order_dialog.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../supervisor/domain/maintenance_order.dart";
 import "../../compras/application/compras_stock_repository_provider.dart";
@@ -82,6 +83,19 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 		} else {
 			context.go("/home");
 		}
+	}
+
+	Future<void> _anularPedido(BuildContext context, MaintenanceOrder mo) async {
+		await handleCancelMaintenanceOrder(
+			context: context,
+			ref: ref,
+			order: mo,
+			onCancel: ({required orderId, required observacion}) =>
+					ref.read(panolForwardedOrdersProvider.notifier).cancelOrder(
+								orderId: orderId,
+								observacion: observacion,
+							),
+		);
 	}
 
 	String _fmtFecha(DateTime d) {
@@ -349,13 +363,16 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																								MaintenanceWorkflowStatus
 																										.comprasArrivedNotified);
 
-																	void onVer() {
+																	Future<void> onVer() async {
 																		if (esConsulta) {
 																			final mo = consultas[idx];
-																			showMaintenanceOrderDetalleDialog(
+																			await showMaintenanceOrderDetalleDialog(
 																				context,
 																				mo,
 																				stockCatalogoCantidad: cantidadStock,
+																				repository: ref.read(
+																					maintenanceOrdersRepositoryProvider,
+																				),
 																			);
 																			return;
 																		}
@@ -378,6 +395,8 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			),
 																		);
 																	}
+
+																	void onVerSync() => unawaited(onVer());
 
 																	Future<void> onTercero() async {
 																		if (!esConsulta) {
@@ -578,12 +597,17 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																		context.push("/panol/seguimiento");
 																	}
 
+																	void onAnularSync() {
+																		if (moRow == null) return;
+																		unawaited(_anularPedido(context, moRow));
+																	}
+
 																	if (compact) {
 																		return _PanolPedidoCardMobile(
 																			pedido: o,
 																			fmtFecha: _fmtFecha,
 																			stockCantidad: cantidadStock,
-																			onVer: onVer,
+																			onVer: onVerSync,
 																			onTercero: onTerceroSync,
 																			workflowMo: moRow?.workflowStatus,
 																			onSeguimiento: moRow == null ? null : onSeguimiento,
@@ -593,6 +617,10 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																					: null,
 																			listoParaRetiro: listoParaRetiro,
 																			onRetiro: listoParaRetiro ? onRetiroSync : null,
+																			puedeAnular: moRow?.puedeAnular ?? false,
+																			onAnular: moRow?.puedeAnular == true
+																					? onAnularSync
+																					: null,
 																		);
 																	}
 
@@ -651,7 +679,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																					child: _PanolPedidosActions(
 																						compact: false,
 																						stockCantidad: cantidadStock,
-																						onVer: onVer,
+																						onVer: onVerSync,
 																						onTercero: onTerceroSync,
 																						workflowMo: moRow?.workflowStatus,
 																						onSeguimiento:
@@ -664,6 +692,10 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																						listoParaRetiro: listoParaRetiro,
 																						onRetiro:
 																								listoParaRetiro ? onRetiroSync : null,
+																						puedeAnular: moRow?.puedeAnular ?? false,
+																						onAnular: moRow?.puedeAnular == true
+																								? onAnularSync
+																								: null,
 																					),
 																				),
 																			],
@@ -703,6 +735,8 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 		this.onAgregarStock,
 		this.listoParaRetiro = false,
 		this.onRetiro,
+		this.puedeAnular = false,
+		this.onAnular,
 	});
 
 	final _PanolPedidoDemo pedido;
@@ -716,6 +750,8 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 	final VoidCallback? onAgregarStock;
 	final bool listoParaRetiro;
 	final VoidCallback? onRetiro;
+	final bool puedeAnular;
+	final VoidCallback? onAnular;
 
 	@override
 	Widget build(BuildContext context) {
@@ -785,6 +821,8 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 								onAgregarStock: onAgregarStock,
 								listoParaRetiro: listoParaRetiro,
 								onRetiro: onRetiro,
+								puedeAnular: puedeAnular,
+								onAnular: onAnular,
 							),
 						],
 					),
@@ -839,6 +877,8 @@ class _PanolPedidosActions extends StatelessWidget {
 		this.onAgregarStock,
 		this.listoParaRetiro = false,
 		this.onRetiro,
+		this.puedeAnular = false,
+		this.onAnular,
 	});
 
 	final bool compact;
@@ -851,6 +891,8 @@ class _PanolPedidosActions extends StatelessWidget {
 	final VoidCallback? onAgregarStock;
 	final bool listoParaRetiro;
 	final VoidCallback? onRetiro;
+	final bool puedeAnular;
+	final VoidCallback? onAnular;
 
 	@override
 	Widget build(BuildContext context) {
@@ -909,49 +951,63 @@ class _PanolPedidosActions extends StatelessWidget {
 								),
 							),
 						),
+						if (puedeAnular && onAnular != null) ...[
+							const SizedBox(height: 8),
+							_anularPedidoButton(compact: true, onAnular: onAnular!),
+						],
 					],
 				);
 			}
-			return Row(
+			return Column(
+				crossAxisAlignment: CrossAxisAlignment.stretch,
+				mainAxisSize: MainAxisSize.min,
 				children: [
-					Expanded(
-						child: OutlinedButton.icon(
-							onPressed: onVer,
-							icon: const Icon(Icons.visibility_outlined, size: 18),
-							label: const Text(
-								"VER",
-								style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
-							),
-							style: OutlinedButton.styleFrom(
-								padding: EdgeInsets.zero,
-								foregroundColor: Colors.black87,
-								side: BorderSide(color: AppTokens.greyBorder),
-								minimumSize: const Size(0, 40),
-							),
-						),
-					),
-					const SizedBox(width: 8),
-					Expanded(
-						flex: 2,
-						child: FilledButton.icon(
-							onPressed: onRetiro,
-							icon: const Icon(Icons.download_done_outlined, size: 18),
-							label: Text(
-								retiroLabel,
-								textAlign: TextAlign.center,
-								style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
-							),
-							style: FilledButton.styleFrom(
-								padding: EdgeInsets.zero,
-								backgroundColor: AppTokens.redAction,
-								foregroundColor: Colors.white,
-								shape: RoundedRectangleBorder(
-									borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+					Row(
+						children: [
+							Expanded(
+								child: OutlinedButton.icon(
+									onPressed: onVer,
+									icon: const Icon(Icons.visibility_outlined, size: 18),
+									label: const Text(
+										"VER",
+										style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+									),
+									style: OutlinedButton.styleFrom(
+										padding: EdgeInsets.zero,
+										foregroundColor: Colors.black87,
+										side: BorderSide(color: AppTokens.greyBorder),
+										minimumSize: const Size(0, 40),
+									),
 								),
-								minimumSize: const Size(0, 40),
 							),
-						),
+							const SizedBox(width: 8),
+							Expanded(
+								flex: 2,
+								child: FilledButton.icon(
+									onPressed: onRetiro,
+									icon: const Icon(Icons.download_done_outlined, size: 18),
+									label: Text(
+										retiroLabel,
+										textAlign: TextAlign.center,
+										style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
+									),
+									style: FilledButton.styleFrom(
+										padding: EdgeInsets.zero,
+										backgroundColor: AppTokens.redAction,
+										foregroundColor: Colors.white,
+										shape: RoundedRectangleBorder(
+											borderRadius: BorderRadius.circular(AppTokens.radiusMd),
+										),
+										minimumSize: const Size(0, 40),
+									),
+								),
+							),
+						],
 					),
+					if (puedeAnular && onAnular != null) ...[
+						const SizedBox(height: 6),
+						_anularPedidoButton(compact: false, onAnular: onAnular!),
+					],
 				],
 			);
 		}
@@ -1010,6 +1066,10 @@ class _PanolPedidosActions extends StatelessWidget {
 								),
 							),
 						),
+						if (puedeAnular && onAnular != null) ...[
+							const SizedBox(height: 8),
+							_anularPedidoButton(compact: true, onAnular: onAnular!),
+						],
 					],
 				);
 			}
@@ -1081,6 +1141,10 @@ class _PanolPedidosActions extends StatelessWidget {
 							),
 						],
 					),
+					if (puedeAnular && onAnular != null) ...[
+						const SizedBox(height: 6),
+						_anularPedidoButton(compact: false, onAnular: onAnular!),
+					],
 				],
 			);
 		}
@@ -1178,6 +1242,10 @@ class _PanolPedidosActions extends StatelessWidget {
 							),
 						),
 					],
+					if (puedeAnular && onAnular != null) ...[
+						const SizedBox(height: 8),
+						_anularPedidoButton(compact: true, onAnular: onAnular!),
+					],
 				],
 			);
 		}
@@ -1272,9 +1340,36 @@ class _PanolPedidosActions extends StatelessWidget {
 						),
 					),
 				],
+				if (puedeAnular && onAnular != null) ...[
+					const SizedBox(height: 6),
+					_anularPedidoButton(compact: false, onAnular: onAnular!),
+				],
 			],
 		);
 	}
+}
+
+Widget _anularPedidoButton({
+	required bool compact,
+	required VoidCallback onAnular,
+}) {
+	return TextButton.icon(
+		onPressed: onAnular,
+		icon: Icon(Icons.cancel_outlined, size: compact ? 18 : 16, color: Colors.red.shade800),
+		label: Text(
+			"ANULAR PEDIDO",
+			style: TextStyle(
+				fontWeight: FontWeight.w800,
+				fontSize: compact ? 12 : 11,
+				color: Colors.red.shade800,
+			),
+		),
+		style: TextButton.styleFrom(
+			padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 4, vertical: compact ? 8 : 4),
+			minimumSize: Size.zero,
+			tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+		),
+	);
 }
 
 /// Indicador de stock (solo lectura) para layout compacto.

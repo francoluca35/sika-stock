@@ -1,12 +1,14 @@
 {
     "name": "Sika Stock",
     "short_name": "Sika Stock",
+    "id": "/",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
     "background_color": "#000000",
     "theme_color": "#E30613",
     "description": "Sistema Pañol — Sika Stock",
-    "orientation": "portrait-primary",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

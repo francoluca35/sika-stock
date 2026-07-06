@@ -44,6 +44,21 @@ bool appRolePuedeGestionarStock(AppRole? rol) {
 	return rol == AppRole.panol;
 }
 
+/// Supervisor, pañol o admin pueden anular pedidos activos de mantenimiento.
+bool appRolePuedeAnularPedidoMantenimiento(AppRole? rol) {
+	switch (rol) {
+		case AppRole.supervisor:
+		case AppRole.panol:
+		case AppRole.admin:
+		case AppRole.superadmin:
+			return true;
+		case AppRole.mantenimiento:
+		case AppRole.compras:
+		case null:
+			return false;
+	}
+}
+
 /// Roles con acceso a la pantalla **Seguimiento** (`/panol/seguimiento`).
 bool appRolePuedeAccederASeguimiento(AppRole? rol) {
 	switch (rol) {
