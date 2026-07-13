@@ -199,7 +199,7 @@ class _SupervisorMaintenanceOrdersScreenState
             ),
           ),
           _TextActionButton(
-            label: "A PAÑOL",
+            label: "ENVIAR A PAÑOL",
             background: Colors.orange.shade800,
             foreground: Colors.white,
             onPressed: () => _decidirStock(context, o, hayStock: false),
@@ -376,31 +376,52 @@ class _SupervisorMaintenanceOrdersScreenState
                       ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            TextButton(
-                              onPressed: () {
-                                setState(
-                                  () => _catalogOverrideByOrderId.remove(o.id),
-                                );
-                                Navigator.pop(ctx);
-                              },
-                              child: const Text("Quitar elección"),
+                            Row(
+                              children: [
+                                TextButton(
+                                  onPressed: () {
+                                    setState(
+                                      () => _catalogOverrideByOrderId
+                                          .remove(o.id),
+                                    );
+                                    Navigator.pop(ctx);
+                                  },
+                                  child: const Text("Quitar elección"),
+                                ),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: const Text("Cancelar"),
+                                ),
+                                const SizedBox(width: 8),
+                                FilledButton(
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: Colors.orange.shade800,
+                                    foregroundColor: Colors.white,
+                                  ),
+                                  onPressed: () {
+                                    Navigator.pop(ctx);
+                                    _decidirStock(
+                                      context,
+                                      o,
+                                      hayStock: false,
+                                    );
+                                  },
+                                  child: const Text("ENVIAR A PAÑOL"),
+                                ),
+                              ],
                             ),
-                            const Spacer(),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx),
-                              child: const Text("Cancelar"),
-                            ),
-                            const SizedBox(width: 8),
+                            const SizedBox(height: 8),
                             FilledButton(
                               onPressed: temp == null
                                   ? null
                                   : () {
                                       setState(
-                                        () =>
-                                            _catalogOverrideByOrderId[o.id] =
-                                                temp,
+                                        () => _catalogOverrideByOrderId[o.id] =
+                                            temp,
                                       );
                                       Navigator.pop(ctx);
                                     },
@@ -697,8 +718,10 @@ class _SupervisorMaintenanceOrdersScreenState
                                     analisis.haySuficiente &&
                                             analisis.match != null
                                         ? "RETIRO OK"
-                                        : "A PAÑOL",
-                                    style: const TextStyle(fontWeight: FontWeight.w800),
+                                        : "ENVIAR A PAÑOL",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -807,9 +830,10 @@ class _SupervisorMaintenanceOrdersScreenState
           );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            "Derivado a pañol: pañol fue notificado.",
+            "Enviado a pañol: se notificó que no hay ese producto. "
+            "Pañol avisará si hay stock o hay que comprar.",
           ),
         ),
       );
