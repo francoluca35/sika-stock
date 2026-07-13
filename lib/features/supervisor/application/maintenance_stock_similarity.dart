@@ -27,6 +27,8 @@ import "../domain/maintenance_order.dart";
 /// Coincidencias entre el texto del pedido de mantenimiento y el catálogo de stock.
 ///
 /// Usa normalización, coincidencia por frase y por tokens (palabras ≥ 2 caracteres).
+/// Exige cobertura mínima de tokens para evitar falsos positivos
+/// (p. ej. solo «tablero» no alcanza frente a «tablero servicios fluidmaster»).
 List<StockProduct> stockSimilarToPedido(
 	String productoPedido,
 	List<StockProduct> catalog,
@@ -83,6 +85,27 @@ List<String> _tokens(String normalizedQuery) {
 			.toList();
 }
 
+int _matchedTokenCount(List<String> queryTokens, StockProduct p) {
+	final nombre = _normalize(p.nombre);
+	final cat = _normalize(p.categoria);
+	final cod = _normalize(p.codigo ?? "");
+	var matched = 0;
+	for (final t in queryTokens) {
+		if (nombre.contains(t) || cat.contains(t) || cod.contains(t)) {
+			matched++;
+		}
+	}
+	return matched;
+}
+
+/// Cantidad mínima de tokens del pedido que deben aparecer en la línea de catálogo.
+int _minMatchedTokensRequired(int queryTokenCount) {
+	if (queryTokenCount <= 1) return 1;
+	if (queryTokenCount == 2) return 2;
+	// ≥3 tokens: al menos la mitad redondeando hacia arriba.
+	return (queryTokenCount + 1) ~/ 2;
+}
+
 int _similarityScore(String queryNorm, StockProduct p) {
 	final nombre = _normalize(p.nombre);
 	final cat = _normalize(p.categoria);
@@ -90,7 +113,9 @@ int _similarityScore(String queryNorm, StockProduct p) {
 	final blob = "$nombre $cat $cod";
 
 	var score = 0;
-	if (queryNorm.isNotEmpty && blob.contains(queryNorm)) {
+	final fraseCompleta =
+			queryNorm.isNotEmpty && blob.contains(queryNorm);
+	if (fraseCompleta) {
 		score += 100 + queryNorm.length;
 	}
 	final qt = _tokens(queryNorm);
@@ -105,5 +130,17 @@ int _similarityScore(String queryNorm, StockProduct p) {
 			score += 18 + t.length;
 		}
 	}
+
+	if (score <= 0) return 0;
+
+	// Frase completa del pedido contenida en la línea → coincidencia válida.
+	if (fraseCompleta) return score;
+
+	if (qt.isEmpty) return 0;
+
+	final matched = _matchedTokenCount(qt, p);
+	final minRequired = _minMatchedTokensRequired(qt.length);
+	if (matched < minRequired) return 0;
+
 	return score;
 }
