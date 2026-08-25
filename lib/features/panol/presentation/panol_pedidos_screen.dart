@@ -15,6 +15,8 @@ import "../../orders/application/order_navigation_target_provider.dart";
 import "../../orders/presentation/widgets/cancel_maintenance_order_dialog.dart";
 import "../../orders/presentation/widgets/maintenance_order_seguimiento_sheet.dart";
 import "../../supervisor/domain/maintenance_order.dart";
+import "../../supervisor/application/maintenance_stock_similarity.dart"
+		show mejorStockMatchConScore, stockSimilarToPedido;
 import "../../compras/application/compras_stock_repository_provider.dart";
 import "../../orders/presentation/widgets/maintenance_order_detail_dialog.dart";
 import "../../supervisor/application/maintenance_orders_provider.dart";
@@ -104,37 +106,16 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 				"${d.year}";
 	}
 
-	bool _productoCoincideConStock({
-		required String pedidoProducto,
-		required StockProduct stockProducto,
-	}) {
-		final pedido = pedidoProducto.toLowerCase().trim();
-		final nombreStock = stockProducto.nombre.toLowerCase();
-
-		if (pedido.isEmpty) return false;
-		if (nombreStock.contains(pedido)) return true;
-
-		final tokens = pedido.split(RegExp(r"\s+")).where((t) => t.length >= 3);
-		for (final t in tokens.take(3)) {
-			if (nombreStock.contains(t)) return true;
-		}
-		return false;
-	}
-
-	StockProduct? _buscarStockMatch({
+	({StockProduct product, int score})? _buscarStockMatch({
 		required String pedidoProducto,
 		required List<StockProduct> stocks,
+		String? stockItemIdPreferido,
 	}) {
-		final pedido = pedidoProducto.split(RegExp(r"[\r\n]+")).first.trim();
-		StockProduct? mejor;
-		for (final p in stocks) {
-			if (!_productoCoincideConStock(pedidoProducto: pedido, stockProducto: p)) {
-				continue;
-			}
-			mejor ??= p;
-			if (p.cantidad > mejor.cantidad) mejor = p;
-		}
-		return mejor;
+		return mejorStockMatchConScore(
+			pedidoProducto,
+			stocks,
+			stockItemIdPreferido: stockItemIdPreferido,
+		);
 	}
 
 	int _calcularCantidadStock(
@@ -143,13 +124,9 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 	) {
 		final nombrePedido =
 				pedido.producto.split(RegExp(r"[\r\n]+")).first.trim();
-		final match = stocks.where(
-			(p) => _productoCoincideConStock(
-				pedidoProducto: nombrePedido,
-				stockProducto: p,
-			),
-		);
-		return match.fold<int>(0, (acc, p) => acc + p.cantidad);
+		final matches = stockSimilarToPedido(nombrePedido, stocks);
+		if (matches.isEmpty) return 0;
+		return matches.fold<int>(0, (acc, p) => acc + p.cantidad);
 	}
 
 	/// Texto bajo el producto en pañol: el ingreso a pañol lo dispara el supervisor,
@@ -343,12 +320,23 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																	final idx = i;
 																	final o = merged[idx];
 																	final esConsulta = idx < consultasCount;
-																	final cantidadStock =
-																			_calcularCantidadStock(o, stocks);
-																	final compact =
-																			_panolPedidosLayoutCompact(context);
+																	final nombrePedidoLinea = o.producto
+																			.split(RegExp(r"[\r\n]+"))
+																			.first
+																			.trim();
 																	final MaintenanceOrder? moRow =
 																			esConsulta ? consultas[idx] : null;
+																	final matchCatalogo = _buscarStockMatch(
+																		pedidoProducto: nombrePedidoLinea,
+																		stocks: stocks,
+																		stockItemIdPreferido: moRow?.stockItemId,
+																	);
+																	final cantidadStock =
+																			_calcularCantidadStock(o, stocks);
+																	final sinCoincidenciaCatalogo =
+																			matchCatalogo == null;
+																	final compact =
+																			_panolPedidosLayoutCompact(context);
 																	final tresBotonesPanolPendiente =
 																			moRow != null &&
 																					moRow.workflowStatus ==
@@ -473,15 +461,17 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			return;
 																		}
 																		final nombrePedido = mo.producto.trim();
-																		final match = _buscarStockMatch(
+																		final matchScored = _buscarStockMatch(
 																			pedidoProducto: nombrePedido,
 																			stocks: stocks,
+																			stockItemIdPreferido: mo.stockItemId,
 																		);
 																		final dialogResult =
 																				await showPanolAgregarStockDialog(
 																			context: context,
 																			order: mo,
-																			matchedProduct: match,
+																			matchedProduct: matchScored?.product,
+																			matchScore: matchScored?.score ?? 0,
 																		);
 																		if (dialogResult == null || !context.mounted) {
 																			return;
@@ -615,6 +605,7 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																			onAgregarStock: tresBotonesPanolPendiente
 																					? onAgregarStockSync
 																					: null,
+																			agregarProductoNuevo: sinCoincidenciaCatalogo,
 																			listoParaRetiro: listoParaRetiro,
 																			onRetiro: listoParaRetiro ? onRetiroSync : null,
 																			puedeAnular: moRow?.puedeAnular ?? false,
@@ -689,6 +680,8 @@ class _PanolPedidosScreenState extends ConsumerState<PanolPedidosScreen> {
 																						onAgregarStock: tresBotonesPanolPendiente
 																								? onAgregarStockSync
 																								: null,
+																						agregarProductoNuevo:
+																								sinCoincidenciaCatalogo,
 																						listoParaRetiro: listoParaRetiro,
 																						onRetiro:
 																								listoParaRetiro ? onRetiroSync : null,
@@ -733,6 +726,7 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 		this.onSeguimiento,
 		this.tresBotonesPanolPendiente = false,
 		this.onAgregarStock,
+		this.agregarProductoNuevo = false,
 		this.listoParaRetiro = false,
 		this.onRetiro,
 		this.puedeAnular = false,
@@ -748,6 +742,7 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 	final VoidCallback? onSeguimiento;
 	final bool tresBotonesPanolPendiente;
 	final VoidCallback? onAgregarStock;
+	final bool agregarProductoNuevo;
 	final bool listoParaRetiro;
 	final VoidCallback? onRetiro;
 	final bool puedeAnular;
@@ -819,6 +814,7 @@ class _PanolPedidoCardMobile extends StatelessWidget {
 								onSeguimiento: onSeguimiento,
 								tresBotonesPanolPendiente: tresBotonesPanolPendiente,
 								onAgregarStock: onAgregarStock,
+								agregarProductoNuevo: agregarProductoNuevo,
 								listoParaRetiro: listoParaRetiro,
 								onRetiro: onRetiro,
 								puedeAnular: puedeAnular,
@@ -875,6 +871,7 @@ class _PanolPedidosActions extends StatelessWidget {
 		this.onSeguimiento,
 		this.tresBotonesPanolPendiente = false,
 		this.onAgregarStock,
+		this.agregarProductoNuevo = false,
 		this.listoParaRetiro = false,
 		this.onRetiro,
 		this.puedeAnular = false,
@@ -889,6 +886,7 @@ class _PanolPedidosActions extends StatelessWidget {
 	final VoidCallback? onSeguimiento;
 	final bool tresBotonesPanolPendiente;
 	final VoidCallback? onAgregarStock;
+	final bool agregarProductoNuevo;
 	final bool listoParaRetiro;
 	final VoidCallback? onRetiro;
 	final bool puedeAnular;
@@ -1034,9 +1032,11 @@ class _PanolPedidosActions extends StatelessWidget {
 						FilledButton.icon(
 							onPressed: onAgregarStock,
 							icon: const Icon(Icons.add_box_outlined, size: 22),
-							label: const Text(
-								"AGREGAR NUEVO STOCK",
-								style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+							label: Text(
+								agregarProductoNuevo
+										? "AGREGAR PRODUCTO NUEVO"
+										: "AGREGAR STOCK",
+								style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
 								textAlign: TextAlign.center,
 							),
 							style: FilledButton.styleFrom(
@@ -1101,10 +1101,12 @@ class _PanolPedidosActions extends StatelessWidget {
 								child: FilledButton.icon(
 									onPressed: onAgregarStock,
 									icon: const Icon(Icons.add_box_outlined, size: 18),
-									label: const Text(
-										"AGREGAR\nSTOCK",
+									label: Text(
+										agregarProductoNuevo
+												? "PRODUCTO\nNUEVO"
+												: "AGREGAR\nSTOCK",
 										textAlign: TextAlign.center,
-										style: TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
+										style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 10),
 									),
 									style: FilledButton.styleFrom(
 										padding: EdgeInsets.zero,
