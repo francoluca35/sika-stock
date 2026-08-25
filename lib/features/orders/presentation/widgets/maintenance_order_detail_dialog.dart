@@ -1,5 +1,9 @@
+import "package:flutter/foundation.dart" show kIsWeb;
 import "package:flutter/material.dart";
+import "package:flutter/services.dart";
+import "package:http/http.dart" as http;
 
+import "../../../../core/files/save_bytes_file.dart";
 import "../../../../core/format/argentina_datetime.dart";
 import "../../../../core/theme/app_tokens.dart";
 import "../../../supervisor/data/maintenance_orders_repository.dart";
@@ -31,10 +35,166 @@ Future<void> showMaintenanceOrderDetalleDialog(
 
 	if (!context.mounted) return;
 
-	showDialog<void>(
+	await showDialog<void>(
 		context: context,
-		builder: (ctx) => AlertDialog(
-			title: const Text("Detalle del pedido"),
+		builder: (ctx) => _DetallePedidoDialog(
+			detail: detail,
+			photoUrl: photoUrl,
+			stockCatalogoCantidad: stockCatalogoCantidad,
+		),
+	);
+}
+
+class _DetallePedidoDialog extends StatefulWidget {
+	const _DetallePedidoDialog({
+		required this.detail,
+		required this.photoUrl,
+		this.stockCatalogoCantidad,
+	});
+
+	final MaintenanceOrder detail;
+	final String? photoUrl;
+	final int? stockCatalogoCantidad;
+
+	@override
+	State<_DetallePedidoDialog> createState() => _DetallePedidoDialogState();
+}
+
+class _DetallePedidoDialogState extends State<_DetallePedidoDialog> {
+	bool _copiando = false;
+	bool _descargando = false;
+
+	String _textoCompleto() {
+		final d = widget.detail;
+		final buf = StringBuffer()
+			..writeln("Detalle del pedido")
+			..writeln(d.numeroOrden)
+			..writeln()
+			..writeln("Fecha: ${ArgentinaDateTime.formatDateTime(d.fechaPedido)}")
+			..writeln("Producto: ${d.producto}")
+			..writeln("Cantidad: ${d.quantity} u.")
+			..writeln("Tipo: ${d.productType}")
+			..writeln("Prioridad: ${d.priority}")
+			..writeln("Destino: ${d.destination}");
+		if (d.observacion.trim().isNotEmpty) {
+			buf.writeln("Observación: ${d.observacion.trim()}");
+		}
+		if (d.cancellationObservacion.trim().isNotEmpty) {
+			buf.writeln("Motivo de anulación: ${d.cancellationObservacion.trim()}");
+		}
+		buf
+			..writeln("Solicitante: ${d.solicitante}")
+			..writeln("Estado: ${_workflowLabel(d.workflowStatus)}")
+			..writeln()
+			..writeln("Línea de tiempo:");
+		for (final step in buildMaintenanceTimelineSteps(d)) {
+			final ts = step.timestamp?.trim();
+			final line = ts != null && ts.isNotEmpty
+					? "· ${step.label}: ${step.subtitle} ($ts)"
+					: "· ${step.label}: ${step.subtitle}";
+			buf.writeln(line);
+		}
+		if (widget.stockCatalogoCantidad != null) {
+			final n = widget.stockCatalogoCantidad!;
+			buf.writeln(
+				n > 0
+						? "Stock en catálogo (aprox.): $n u. disponibles"
+						: "Stock en catálogo (aprox.): Sin coincidencia en inventario digital",
+			);
+		}
+		final resumen = d.motivo.trim();
+		if (resumen.isNotEmpty) {
+			buf.writeln("Resumen: $resumen");
+		}
+		return buf.toString().trim();
+	}
+
+	Future<void> _copiarTexto() async {
+		if (_copiando) return;
+		setState(() => _copiando = true);
+		try {
+			await Clipboard.setData(ClipboardData(text: _textoCompleto()));
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				const SnackBar(content: Text("Detalle copiado al portapapeles")),
+			);
+		} catch (e) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudo copiar: $e")),
+			);
+		} finally {
+			if (mounted) setState(() => _copiando = false);
+		}
+	}
+
+	({String mime, String ext}) _mimeDesdeUrl(String url) {
+		final lower = url.toLowerCase();
+		if (lower.contains(".png")) return (mime: "image/png", ext: "png");
+		if (lower.contains(".webp")) return (mime: "image/webp", ext: "webp");
+		if (lower.contains(".gif")) return (mime: "image/gif", ext: "gif");
+		return (mime: "image/jpeg", ext: "jpg");
+	}
+
+	Future<void> _descargarImagen() async {
+		final foto = widget.photoUrl?.trim();
+		if (foto == null || foto.isEmpty || _descargando) return;
+		setState(() => _descargando = true);
+		try {
+			final res = await http.get(Uri.parse(foto));
+			if (res.statusCode < 200 || res.statusCode >= 300) {
+				throw StateError("HTTP ${res.statusCode}");
+			}
+			final info = _mimeDesdeUrl(foto);
+			final name = "${widget.detail.numeroOrden}-foto.${info.ext}";
+			await saveBytesToDevice(
+				bytes: res.bodyBytes,
+				filename: name,
+				mimeType: info.mime,
+			);
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(
+					content: Text(
+						kIsWeb ? "Descarga iniciada: $name" : "Imagen guardada: $name",
+					),
+				),
+			);
+		} catch (e) {
+			if (!mounted) return;
+			ScaffoldMessenger.of(context).showSnackBar(
+				SnackBar(content: Text("No se pudo descargar la imagen: $e")),
+			);
+		} finally {
+			if (mounted) setState(() => _descargando = false);
+		}
+	}
+
+	@override
+	Widget build(BuildContext context) {
+		final detail = widget.detail;
+		final photoUrl = widget.photoUrl;
+		final stockCatalogoCantidad = widget.stockCatalogoCantidad;
+
+		return AlertDialog(
+			title: Row(
+				children: [
+					const Expanded(
+						child: Text("Detalle del pedido"),
+					),
+					IconButton(
+						tooltip: "Copiar detalle",
+						onPressed: _copiando ? null : _copiarTexto,
+						icon: _copiando
+								? const SizedBox(
+										width: 22,
+										height: 22,
+										child: CircularProgressIndicator(strokeWidth: 2),
+									)
+								: const Icon(Icons.copy_all_outlined),
+					),
+				],
+			),
 			content: SingleChildScrollView(
 				child: Column(
 					crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -109,19 +269,39 @@ Future<void> showMaintenanceOrderDetalleDialog(
 								),
 							),
 							const SizedBox(height: 8),
-							OutlinedButton.icon(
-								onPressed: () {
-									showMaintenanceOrderPhotoDialog(
-										ctx,
-										photoUrl!,
-										title: "Foto del pedido · ${detail.numeroOrden}",
-									);
-								},
-								icon: const Icon(Icons.image_outlined, size: 20),
-								label: const Text(
-									"VER IMAGEN",
-									style: TextStyle(fontWeight: FontWeight.w700),
-								),
+							Wrap(
+								spacing: 8,
+								runSpacing: 8,
+								children: [
+									OutlinedButton.icon(
+										onPressed: () {
+											showMaintenanceOrderPhotoDialog(
+												context,
+												photoUrl,
+												title: "Foto del pedido · ${detail.numeroOrden}",
+											);
+										},
+										icon: const Icon(Icons.image_outlined, size: 20),
+										label: const Text(
+											"VER IMAGEN",
+											style: TextStyle(fontWeight: FontWeight.w700),
+										),
+									),
+									OutlinedButton.icon(
+										onPressed: _descargando ? null : _descargarImagen,
+										icon: _descargando
+												? const SizedBox(
+														width: 18,
+														height: 18,
+														child: CircularProgressIndicator(strokeWidth: 2),
+													)
+												: const Icon(Icons.download_outlined, size: 20),
+										label: const Text(
+											"DESCARGAR IMAGEN",
+											style: TextStyle(fontWeight: FontWeight.w700),
+										),
+									),
+								],
 							),
 						],
 					],
@@ -129,12 +309,12 @@ Future<void> showMaintenanceOrderDetalleDialog(
 			),
 			actions: [
 				TextButton(
-					onPressed: () => Navigator.pop(ctx),
+					onPressed: () => Navigator.pop(context),
 					child: const Text("Cerrar"),
 				),
 			],
-		),
-	);
+		);
+	}
 }
 
 String _workflowLabel(MaintenanceWorkflowStatus w) {
